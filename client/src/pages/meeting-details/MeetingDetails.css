@@ -1,0 +1,32 @@
+.perspective--modalview {
+  position: fixed;
+  -webkit-perspective: 1500px;
+  perspective: 1500px;
+}
+
+.effect-rotate-left--animate .container {
+  -webkit-transform: translateZ(-1800px) translateX(-50%) rotateY(45deg);
+  transform: translateZ(-1800px) translateX(-50%) rotateY(45deg);
+  outline: 30px solid #34658e;
+}
+
+.perspective {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.meeting-container {
+  height: 100vh;
+  position: relative;
+  -webkit-transform: translateZ(0) translateX(0) rotateY(0deg);
+  transform: translateZ(0) translateX(0) rotateY(0deg);
+  min-height: 100%;
+  outline: 30px solid #34658e;
+  -webkit-transition: -webkit-transform 0.4s;
+  transition: -webkit-transform 0.4s;
+  transition: transform 0.4s;
+  transition: transform 0.4s, -webkit-transform 0.4s;
+  @apply w-full flex gap-4 p-4;
+}
