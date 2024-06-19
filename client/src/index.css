@@ -1,68 +1,140 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
-body {
   margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  @apply text-green-100;
+  background: #000;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  @apply text-green-100;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+}
+
+#main {
+  height: 100vh;
+  min-height: 500px;
+  width: 100%;
+  background-color: black;
+  @apply flex justify-center items-center flex-col relative;
+}
+
+#nav {
   display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+  padding: 0 30px;
+  @apply fixed w-full top-0;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+#nav-part2 {
+  display: flex;
+  align-items: center;
+  gap: 30px;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
+#nav h3 {
+  font-size: 25px;
+  text-transform: uppercase;
+  font-weight: 400;
+}
+
+#main h1 {
+  @apply xl:text-[8rem] lg:text-[5rem] md:text-[5rem] sm:text-[4rem] text-[2.5rem] text-green-100;
+  @apply xl:leading-[8rem] lg:leading-[6rem] md:leading-[6rem] sm:leading-[5rem] leading-[4rem];
+  text-transform: uppercase;
+  font-weight: 400;
+  width: 80%;
+  margin-left: 10%;
+  position: relative;
+  z-index: 10;
+}
+
+#main h1:nth-child(2) {
+  margin-top: 180px;
+}
+#main h1:nth-child(3) {
+  text-align: center;
+}
+#main h1:nth-child(4) {
+  text-align: center;
+}
+
+#main img {
+  height: 400px;
+  position: absolute;
+  top: 12%;
+  left: 40%;
+  @apply md:block hidden;
+}
+#img1 {
+  rotate: 20deg;
+}
+#img2 {
+  rotate: 10deg;
+}
+
+.start-input-container {
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  max-width: 400px;
+  border: 3px solid #000000;
+  font-size: 2rem;
+  box-shadow: rgba(169, 249, 1, 0.3) 10px 10px;
+  opacity: 1;
+  transition: all 0.5s;
+}
+
+.start-input-container:has(button:hover) {
+  box-shadow: none;
+}
+
+.start-input-container:has(input:focus) {
+  box-shadow: none;
+}
+
+.start-input-container > input {
+  padding: 20px 15px;
+  width: 100%;
+  outline: none;
+  border-top: 0;
+  border-bottom: 0;
+  border-left: 0;
+  color: #000000;
+  border-right: 3px solid black;
+  font-size: 1.7rem;
+  transition: all 0.5s;
+  @apply bg-green-100;
+}
+
+.start-input-container button {
+  padding: 18px 30px;
+  background-color: #a9f901;
+  color: #000000;
+  border: 0;
+  transition: all 0.5s;
   cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  pointer-events: auto;
+  font-size: 2.5rem;
+  font-weight: 800;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+.start-input-container button:hover {
+  background-color: #aaf901e9;
 }
