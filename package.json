@@ -1,0 +1,31 @@
+{
+  "name": "multimeet",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "engines": {
+    "npm": ">=8.0.0",
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "install-server": "yarn install --cwd ./server",
+    "install-client": "yarn install --cwd ./client",
+    "install": "yarn install-server && yarn install-client",
+    "server": "yarn watch --prefix server",
+    "client": "yarn start --prefix client",
+    "watch": "yarn server & yarn client",
+    "deploy": "yarn build --cwd ./client && npm start --cwd ./server",
+    "test": "yarn test --cwd ./client",
+    "lint": "yarn lint --cwd ./server"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/silvareal/multimeet.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/silvareal/multimeet/issues"
+  },
+  "homepage": "https://github.com/silvareal/multimeet#readme"
+}
