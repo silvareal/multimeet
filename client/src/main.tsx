@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import "./index.css";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import Home from "./pages/Home";
-import MeetingDetails from "./pages/meeting-details/MeetingDetails";
+import Meeting from "./pages/meeting/Meeting";
 
 const router = createBrowserRouter([
   {
@@ -12,7 +12,7 @@ const router = createBrowserRouter([
   },
   {
     path: "/:meetingId",
-    element: <MeetingDetails />,
+    element: <Meeting />,
   },
 ]);
 

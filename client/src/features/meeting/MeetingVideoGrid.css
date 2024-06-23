@@ -1,0 +1,64 @@
+.video-container {
+  @apply rounded-xl bg-[#202933] relative;
+  @apply flex justify-center items-center;
+  vertical-align: middle;
+  align-self: center;
+  overflow: hidden;
+  animation: show 0.4s ease;
+}
+
+.video-container video {
+  @apply bg-[#202933] absolute right-0 bottom-0 w-full h-full;
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  left: 0;
+  top: 0;
+  background-size: cover;
+  overflow: hidden;
+  transition: margin-top 1s ease-in-out;
+}
+
+/* User fullname */
+.video-container:after {
+  color: #ddd;
+  @apply absolute rounded-xl font-normal;
+  font-size: 0.75rem;
+  bottom: 10px;
+  left: 15px;
+  content: attr(data-fullName);
+  background-color: rgba(0, 0, 0, 0.3);
+  padding: 0.15rem 0.5rem;
+  display: block;
+  text-transform: capitalize;
+}
+
+/* video photo, camera off */
+.video-container:before {
+  position: absolute;
+  height: var(--video-height);
+  width: var(--video-width);
+  background-image: url("https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRXxfn1j1vKFy8yJeBGl2AS6Dcah-lKgHofg&s");
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
+  max-width: 250px;
+  max-height: 250px;
+  content: "";
+  z-index: 2;
+  @apply rounded-full flex justify-center text-center bg-black;
+}
+
+@keyframes show {
+  0% {
+    opacity: 0;
+    transform: scale(0.4) translateY(20px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}

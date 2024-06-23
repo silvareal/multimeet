@@ -7,7 +7,6 @@
   padding: 0;
   box-sizing: border-box;
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  @apply text-green-100;
   background: #000;
 }
 
@@ -137,4 +136,39 @@ body {
 
 .start-input-container button:hover {
   background-color: #aaf901e9;
+}
+
+.icon-button {
+  outline: none;
+  color: "white";
+  font-size: 1.5rem;
+  background-color: #202933;
+  @apply rounded-lg w-10 h-10 inline-flex justify-center items-center p-2 text-green-100;
+  transition: all 0.3s;
+}
+
+.icon-button:hover {
+  background-color: #384657;
+}
+
+.icon-button:focus {
+  background-color: #384657;
+}
+
+.text-input {
+  @apply px-2 py-4 rounded-lg w-full text-black;
+  outline: none;
+}
+
+.text-input:focus {
+  @apply border-black;
+}
+
+.button {
+  @apply w-full bg-secondary-main text-primary-main rounded-lg py-2 text-[1.2rem] inline-flex items-center justify-center gap-2;
+  transition: all 0.5s;
+}
+
+.button:hover {
+  opacity: 0.9;
 }
