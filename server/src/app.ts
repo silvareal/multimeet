@@ -17,12 +17,12 @@ app.use(morgan("combined"));
 // Frontend as staticfiles
 app.use(express.json());
 
-app.use(express.static(path.join(__dirname, "..", "public")));
-app.use(express.static(path.join(__dirname, "../../client/dist")));
+// app.use(express.static(path.join(__dirname, "..", "public")));
+// app.use(express.static(path.join(__dirname, "../client/dist")));
 
-app.get("/*", (req: Request, res: Response) => {
-  res.sendFile(path.join(__dirname, "../../client/dist", "index.html"));
-});
+// app.get("/*", (req: Request, res: Response) => {
+//   res.sendFile(path.join(__dirname, "../client/dist", "index.html"));
+// });
 
 // Server images staticfiles directory
 app.use(express.static("public"));
