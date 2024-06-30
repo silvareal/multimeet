@@ -3,38 +3,22 @@ import "./Meeting.css";
 import clsx from "clsx";
 import { Icon } from "@iconify-icon/react/dist/iconify.js";
 import MeetingDetailsVideoGrid from "../../features/meeting/MeetingVideoGrid";
-import MeetingGetStarted from "./MeetingGetStarted";
 import MeetingDetails from "../../features/meeting/MeetingDetails";
+import { useParams } from "react-router-dom";
+import MeetingLobby from "./MeetingLobby.tsx";
 
 export default function Meeting() {
+  const { id } = useParams<{ id: string }>() as { id: string };
+
   const [transformPerspective, setTransformPerspective] = useState(false);
-  const [videosStreams, setVideosStreams] = useState([
-    "https://alicunde.github.io/Videoconference-Dish-CSS-JS/videos/demo.mp4",
-    "https://alicunde.github.io/Videoconference-Dish-CSS-JS/videos/demo.mp4",
-    "https://alicunde.github.io/Videoconference-Dish-CSS-JS/videos/demo.mp4",
-  ]);
+  const [videosStreams, setVideosStreams] = useState([]);
 
-  const handleAddStream = () => [
-    setVideosStreams((prev) => [
-      ...prev,
-      "https://alicunde.github.io/Videoconference-Dish-CSS-JS/videos/demo.mp4",
-    ]),
-  ];
-
-  const handleRemoveStream = () => {
-    setVideosStreams((prev) => {
-      const newStream = [...prev];
-      newStream.splice(0, 1);
-      return newStream;
-    });
-  };
-
-  const getStarted = false;
+  const [canJoin, setCanJoin] = useState(true);
 
   return (
     <div>
-      {getStarted ? (
-        <MeetingGetStarted />
+      {canJoin ? (
+        <MeetingLobby />
       ) : (
         <div className="meeting-container">
           <div className="w-full">

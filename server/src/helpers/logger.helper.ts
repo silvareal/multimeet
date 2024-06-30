@@ -1,9 +1,18 @@
-import winston from "winston";
+import winston, { format } from "winston";
+const { combine, timestamp, prettyPrint } = format;
 
 const logger = winston.createLogger({
   level: "info",
-  format: winston.format.json(),
-  transports: [new winston.transports.Console()],
+  format: combine(prettyPrint()),
+  transports: [
+    new winston.transports.Console({
+      format: winston.format.combine(
+        winston.format.colorize(),
+        // format.splat(),
+        winston.format.simple()
+      ),
+    }),
+  ],
 });
 
 //

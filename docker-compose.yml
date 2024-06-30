@@ -1,0 +1,24 @@
+services:
+  server:
+    container_name: multimeet
+    user: root
+    build:
+      dockerfile: Dockerfile
+      context: .
+      target: development
+    command: npm run watch
+    ports:
+      - ${PORT:-6500}:${PORT:-6500}
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - /app/client/node_modules
+      - /app/server/node_modules
+    env_file:
+      - client/.env
+      - server/.env
+
+volumes:
+  server:
+    driver: local
+  

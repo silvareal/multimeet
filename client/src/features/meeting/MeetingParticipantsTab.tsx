@@ -1,5 +1,4 @@
 import { Icon } from "@iconify-icon/react/dist/iconify.js";
-import React from "react";
 
 export default function MeetingParticipantsTab() {
   const participants = [

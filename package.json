@@ -8,15 +8,15 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "install-server": "yarn install --cwd ./server",
-    "install-client": "yarn install --cwd ./client",
-    "install": "yarn install-server && yarn install-client",
-    "server": "yarn watch --prefix server",
-    "client": "yarn start --prefix client",
-    "watch": "yarn server & yarn client",
-    "deploy": "yarn build --cwd ./client && npm start --cwd ./server",
-    "test": "yarn test --cwd ./client",
-    "lint": "yarn lint --cwd ./server"
+    "install-server": "npm install --prefix server",
+    "install-client": "npm install --prefix client",
+    "install": "npm run install-server && npm run install-client",
+    "server": "npm run watch --prefix server",
+    "client": "npm run dev --prefix client",
+    "watch": "npm run server & npm run client",
+    "deploy": "npm run build --prefix client && npm start --prefix server",
+    "test": "npm run test --prefix client",
+    "lint": "npm run lint --prefix server"
   },
   "repository": {
     "type": "git",

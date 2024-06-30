@@ -8,41 +8,43 @@ export default function MeetingVideoGrid({
   videosStreams,
   transformPerspective,
 }: any) {
-  const containerRef = useRef(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
   const totalPages = Math.ceil(videosStreams.length / itemsPerPage);
 
   const resizeVideos = () => {
-    const container = containerRef.current as any;
-    const videos = container.getElementsByClassName("video-container");
+    const container = containerRef.current;
+    const videos = container?.getElementsByClassName("video-container");
+    if (videos) {
+      // Get the width and height of the parent
+      const containerWidth = container?.clientWidth || 0;
+      const containerHeight = container?.clientHeight || 0;
 
-    // Get the width and height of the parent
-    const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
+      // Determine the number of rows and columns based on the number of videos
+      const numVideos = videos.length;
+      let rows = Math.ceil(Math.sqrt(numVideos));
+      let cols = Math.ceil(numVideos / rows);
 
-    // Determine the number of rows and columns based on the number of videos
-    const numVideos = videos.length;
-    let rows = Math.ceil(Math.sqrt(numVideos));
-    let cols = Math.ceil(numVideos / rows);
+      // If the container is wider than it is tall, switch rows and columns
+      if (containerWidth > containerHeight) {
+        [rows, cols] = [cols, rows];
+      }
 
-    // If the container is wider than it is tall, switch rows and columns
-    if (containerWidth > containerHeight) {
-      [rows, cols] = [cols, rows];
-    }
+      // Calculate the width and height of each video
+      const videoWidth = (containerWidth - (cols - 1) * 10) / cols;
+      const videoHeight = (containerHeight - (rows - 1) * 10) / rows;
 
-    // Calculate the width and height of each video
-    const videoWidth = (containerWidth - (cols - 1) * 10) / cols;
-    const videoHeight = (containerHeight - (rows - 1) * 10) / rows;
+      // Set the width and height of each video
+      for (let i = 0; i < videos.length; i++) {
+        const video = videos[i] as any;
+        video.style.width = `${videoWidth}px`;
+        video.style.height = `${videoHeight}px`;
 
-    // Set the width and height of each video
-    for (let i = 0; i < videos.length; i++) {
-      videos[i].style.width = `${videoWidth}px`;
-      videos[i].style.height = `${videoHeight}px`;
-
-      videos[i].style.setProperty("--video-width", `${videoWidth / 2}px`, "");
-      videos[i].style.setProperty("--video-height", `${videoWidth / 2}px`, "");
+        video.style.setProperty("--video-width", `${videoWidth / 2}px`, "");
+        video.style.setProperty("--video-height", `${videoWidth / 2}px`, "");
+      }
     }
   };
 
@@ -89,7 +91,8 @@ export default function MeetingVideoGrid({
       {currentVideosStreams.map((videoStream: any) => (
         <MeetingVideoContainer
           data-fullName="Sylvernus Akubo"
-          videoStream={videoStream}
+          // videoStream={videoStream}
+          avatar="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRXxfn1j1vKFy8yJeBGl2AS6Dcah-lKgHofg&s"
         />
       ))}
 

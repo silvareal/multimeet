@@ -22,9 +22,11 @@ http://patorjk.com/software/taag/#p=display&f=ANSI%20Regular&t=multimeet
 import http from "http";
 import { Server } from "socket.io";
 import * as dotenv from "dotenv"; // see https://github.com/motdotla/dotenv#how-do-i-use-dotenv-with-import
-dotenv.config();
 
 import app from "./app";
+import sockets from "./sockets";
+
+dotenv.config();
 
 const PORT = process.env.SERVER_PORT || 9000;
 
@@ -40,7 +42,7 @@ async function startServer() {
   server.listen(PORT, () => {
     console.log(`Listening on port ${PORT}...`);
   });
-  // sockets(socketServer);
+  sockets(socketServer);
 }
 
 startServer();

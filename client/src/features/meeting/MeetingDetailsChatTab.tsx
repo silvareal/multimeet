@@ -1,4 +1,3 @@
-import React from "react";
 import "./MeetingDetailsChatTab.css";
 import clsx from "clsx";
 import { format } from "date-fns";

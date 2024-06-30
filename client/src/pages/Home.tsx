@@ -1,22 +1,22 @@
-import React from "react";
 import gsap from "gsap";
+import * as yup from "yup";
+import { useFormik } from "formik";
 import { useGSAP } from "@gsap/react";
 import { Icon } from "@iconify-icon/react/dist/iconify.js";
+
+import { roomSocket } from "../constants/socket.constant";
+import { generateMeetingId } from "../utils/string.utils";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 
 gsap.registerPlugin(useGSAP);
 
 export default function Home() {
+  const navigate = useNavigate();
+
   const gsapTImeline = gsap.timeline();
 
   useGSAP(() => {
-    gsapTImeline.from("#nav h3", {
-      y: -50,
-      opacity: 0,
-      delay: 0.4,
-      duration: 0.8,
-      stagger: 0.3,
-    });
-
     gsapTImeline.from("#main h1", {
       x: -500,
       opacity: 0,
@@ -38,6 +38,22 @@ export default function Home() {
       duration: 1,
       stagger: 1,
     });
+  });
+
+  const formik = useFormik({
+    initialValues: { roomId: generateMeetingId() },
+    validationSchema: yup.object({
+      roomId: yup.string().required(),
+    }),
+    onSubmit: async (values) => {
+      try {
+        const { roomId } = values;
+        roomSocket.emit("room:create", roomId);
+        navigate(roomId);
+      } catch (error) {
+        toast.error("Something went wrong");
+      }
+    },
   });
 
   return (
@@ -72,12 +88,20 @@ export default function Home() {
       />
 
       <div className="join-input mt-10 mb-5">
-        <div className="start-input-container">
-          <input placeholder="hddyd-ijej" />
-          <button>
+        <form onSubmit={formik.handleSubmit} className="start-input-container">
+          <input
+            placeholder="hddd-ijej"
+            type="text"
+            id="roomId"
+            name="roomId"
+            value={formik.values.roomId}
+            onChange={formik.handleChange}
+            required
+          />
+          <button disabled={!formik.values.roomId} type="submit">
             <Icon icon="pixelarticons:arrow-right" style={{ color: "black" }} />
           </button>
-        </div>
+        </form>
       </div>
     </div>
   );

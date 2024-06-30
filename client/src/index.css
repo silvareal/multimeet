@@ -151,6 +151,12 @@ body {
   background-color: #384657;
 }
 
+.icon-button:disabled,
+button[disabled] {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 .icon-button:focus {
   background-color: #384657;
 }
@@ -171,4 +177,10 @@ body {
 
 .button:hover {
   opacity: 0.9;
+}
+
+.button:disabled,
+button[disabled] {
+  opacity: 0.3;
+  cursor: not-allowed;
 }

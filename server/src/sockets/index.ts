@@ -1,6 +1,6 @@
-import { video } from "./video.socket";
+import { RoomSocket } from "./room.socket";
 
-export default function listen(io: any) {
-  // video meet io namespace
-  video(io);
+export default function sockets(io: any) {
+  // room io namespace
+  RoomSocket(io);
 }
