@@ -1,57 +1,72 @@
 import * as mediaSoupClient from "mediasoup-client";
 
 import { roomSocket } from "../constants/socket.constant";
-import { PeerInfo } from "../types/room.type";
+import { MediaType, PeerInfo, RoomStateType } from "../types/room.type";
 import { toast } from "react-toastify";
-import { StreamContextType } from "../providers/StreamProvider";
+import { RoomStateContextType } from "providers/RoomProvider";
+import { StreamContextType } from "providers/StreamProvider";
+import { Producer } from "mediasoup-client/lib/Producer";
 
 export class RoomClient {
   toast;
   socket;
   roomId;
   context;
-  producers;
   consumers;
-  producerTransport;
-  consumerTransport;
+  streamContext: StreamContextType;
 
-  private mediasoupDevice: mediaSoupClient.types.Device | null;
-  private routerRtpCapabilities: mediaSoupClient.types.RtpCapabilities | null;
+  private producerTransport!: mediaSoupClient.types.Transport;
+  private consumerTransport!: mediaSoupClient.types.Transport<mediaSoupClient.types.AppData>;
+  private mediasoupDevice!: mediaSoupClient.types.Device;
+  private routerRtpCapabilities!: mediaSoupClient.types.RtpCapabilities;
 
-  constructor(roomId: string, streamContext: StreamContextType) {
-    this.socket = roomSocket;
-    this.roomId = roomId;
-    this.context = streamContext;
-    this.producers = new Map();
-    this.consumers = new Map();
-    this.producerTransport = new Map();
-    this.consumerTransport = new Map();
+  private webcamProducer!: mediaSoupClient.types.Producer;
+  private micProducer!: mediaSoupClient.types.Producer;
+  // private screenProducer!: mediaSoupClient.types.Producer;
+
+  constructor(
+    roomId: string,
+    roomStateContext: RoomStateContextType,
+    streamContext: StreamContextType
+  ) {
     this.toast = toast;
-    this.mediasoupDevice = null;
-    this.routerRtpCapabilities = null;
+    this.roomId = roomId;
+    this.socket = roomSocket;
+    this.context = roomStateContext;
+    this.streamContext = streamContext;
+    this.consumers = new Map();
   }
 
   async join(peerInfo: PeerInfo) {
     this.socket.emit(
       "room:join",
       { roomId: this.roomId, peerInfo },
-      ({ error }: any) => {
+      ({ error, response }: any) => {
         if (error) {
           this.toast.error(error, { position: "top-center" });
         } else {
           this.toast("connecting...");
-          this._join();
+          this.toast.dismiss();
+          this.toast.info("Connected", { position: "top-left" });
+          this.context.dispatch({
+            type: RoomStateType.SET_AUTH_PEER,
+            payload: {
+              ...response,
+            },
+          });
+          this.process();
+          this.initializeSocket();
         }
       }
     );
   }
 
-  async _join() {
+  private async process() {
     await this.socket.emit(
       "getRouterRtpCapabilities",
       async (rtpCapabilities: mediaSoupClient.types.RtpCapabilities) => {
         this.routerRtpCapabilities = rtpCapabilities;
-        console.log({ rtpCapabilities, 2: this.routerRtpCapabilities });
+
         await this.loadDevice();
 
         // https://mediasoup.org/documentation/v3/tricks/#rtp-capabilities-filtering
@@ -62,33 +77,12 @@ export class RoomClient {
           );
 
         await this.createSendTransport();
+        await this.createRecvTransport();
       }
     );
   }
 
-  private async loadDevice() {
-    try {
-      // https://mediasoup.org/documentation/v3/mediasoup-client/api/#Device
-      // A device represents an endpoint that connects to a mediasoup Router to send and/or receive media.
-      this.mediasoupDevice = new mediaSoupClient.Device();
-
-      // https://mediasoup.org/documentation/v3/mediasoup-client/api/#device-load
-      // Loads the device with the RTP capabilities of the mediasoup router.
-      // This is how the device knows about the allowed media codecs and other settings.
-      await this.mediasoupDevice.load({
-        routerRtpCapabilities: this.routerRtpCapabilities,
-      });
-    } catch (error: any) {
-      console.log({ error });
-      if (error.name === "UnsupportedError") {
-        this.toast.error("Browser not supported", { position: "top-center" });
-      } else {
-        this.toast.error("Browser not supported", { position: "top-center" });
-      }
-    }
-  }
-
-  getLocalStream() {
+  getLocalStream(callback: (stream: MediaStream) => void) {
     navigator.mediaDevices
       .getUserMedia({
         audio: true,
@@ -104,7 +98,8 @@ export class RoomClient {
         },
       })
       .then((stream) => {
-        this.context.setStream(stream);
+        this.streamContext.setStream(stream);
+        callback(stream);
       })
       .catch((err) => {
         /* handle the error */
@@ -157,28 +152,61 @@ export class RoomClient {
       });
   }
 
+  // Device loading
+  private async loadDevice() {
+    try {
+      // https://mediasoup.org/documentation/v3/mediasoup-client/api/#Device
+      // A device represents an endpoint that connects to a mediasoup Router to send and/or receive media.
+      this.mediasoupDevice = new mediaSoupClient.Device();
+
+      // https://mediasoup.org/documentation/v3/mediasoup-client/api/#device-load
+      // Loads the device with the RTP capabilities of the mediasoup router.
+      // This is how the device knows about the allowed media codecs and other settings.
+      await this.mediasoupDevice.load({
+        routerRtpCapabilities: this.routerRtpCapabilities,
+      });
+    } catch (error: any) {
+      console.log({ error });
+      if (error.name === "UnsupportedError") {
+        this.toast.error("Browser not supported", { position: "top-center" });
+      } else {
+        this.toast.error("Browser not supported", { position: "top-center" });
+      }
+    }
+  }
+
+  // Create transport for sending media:
   private async createSendTransport() {
     this.socket.emit(
       "createWebRtcTransport",
-      { sender: true },
-      (
-        createWebRtcTransportPayload: mediaSoupClient.types.TransportOptions<mediaSoupClient.types.AppData>
+      async (
+        transportInfo: mediaSoupClient.types.TransportOptions<mediaSoupClient.types.AppData>
       ) => {
-        console.log({ createWebRtcTransportPayload });
-        const producerTransport = this.mediasoupDevice?.createSendTransport({
-          ...createWebRtcTransportPayload,
+        const {
+          id,
+          iceParameters,
+          iceCandidates,
+          dtlsParameters,
+          sctpParameters,
+        } = transportInfo;
+        this.producerTransport = this.mediasoupDevice?.createSendTransport({
+          id,
+          iceParameters,
+          iceCandidates,
+          dtlsParameters,
+          sctpParameters,
         });
 
-        if (producerTransport) {
+        if (this.producerTransport) {
           // https://mediasoup.org/documentation/v3/mediasoup-client/api/#transport-on-connect
-          producerTransport.on(
+          this.producerTransport.on(
             "connect",
             async ({ dtlsParameters }, callback, errback) => {
               try {
                 // Signal local DTLS parameters to the server side transport
-                // see server's socket.on('connectSendWebRtcTransport', ...)
-                await this.socket.emit("connectSendWebRtcTransport", {
-                  transportId: producerTransport.id,
+                // see server's socket.on('connectWebRtcTransport', ...)
+                await this.socket.emit("connectWebRtcTransport", {
+                  transportId: this.producerTransport.id,
                   dtlsParameters,
                 });
 
@@ -193,7 +221,7 @@ export class RoomClient {
           // https://mediasoup.org/documentation/v3/mediasoup-client/api/#transport-on-produce
           // this event is raised when a first call to transport.produce() is made
           // see connectSendTransport() below
-          producerTransport.on(
+          this.producerTransport.on(
             "produce",
             async (parameters, callback, errBack) => {
               try {
@@ -202,7 +230,7 @@ export class RoomClient {
                 await this.socket.emit(
                   "createProducer",
                   {
-                    transportId: producerTransport.id,
+                    transportId: this.producerTransport.id,
                     kind: parameters.kind,
                     rtpParameters: parameters.rtpParameters,
                     appData: parameters.appData,
@@ -211,6 +239,8 @@ export class RoomClient {
                     // Let's assume the server included the created producer id in the response
                     // data object.
                     callback({ id });
+
+                    // this.socket.emit("getProducers");
                   }
                 );
               } catch (error: any) {
@@ -218,51 +248,193 @@ export class RoomClient {
               }
             }
           );
+
+          await this.produceMedia(MediaType.AUDIO);
+          await this.produceMedia(MediaType.VIDEO);
         }
       }
     );
   }
 
-  // private async createRecvTransport(device: mediaSoupClient.types.Device) {
-  //   this.socket.emit(
-  //     "createWebRtcTransport",
-  //     { sender: false },
-  //     (
-  //       parameters: mediaSoupClient.types.TransportOptions<mediaSoupClient.types.AppData>
-  //     ) => {
-  //       // https://mediasoup.org/documentation/v3/mediasoup-client/api/#device-createRecvTransport
-  //       //    Creates a new WebRTC transport to receive media. The transport must be previously created in the mediasoup router via
-  //       const consumerTransport = device.createRecvTransport({
-  //         ...parameters,
-  //         dtlsParameters: {
-  //           ...parameters.dtlsParameters,
-  //           // Remote DTLS role. We know it's always 'auto' by default so, if
-  //           // we want, we can force local WebRTC transport to be 'client' by
-  //           // indicating 'server' here and vice-versa.
-  //           role: "auto",
-  //         },
-  //       });
+  // Create transport for receiving media
+  private async createRecvTransport() {
+    this.socket.emit(
+      "createWebRtcTransport",
+      (
+        parameters: mediaSoupClient.types.TransportOptions<mediaSoupClient.types.AppData>
+      ) => {
+        // https://mediasoup.org/documentation/v3/mediasoup-client/api/#device-createRecvTransport
+        // Creates a new WebRTC transport to receive media. The transport must be previously created in the mediasoup router via
+        this.consumerTransport = this.mediasoupDevice.createRecvTransport({
+          ...parameters,
+          dtlsParameters: {
+            ...parameters.dtlsParameters,
+            // Remote DTLS role. We know it's always 'auto' by default so, if
+            // we want, we can force local WebRTC transport to be 'client' by
+            // indicating 'server' here and vice-versa.
+            role: "auto",
+          },
+        });
 
-  //       // https://mediasoup.org/documentation/v3/mediasoup-client/api/#transport-on-connect
-  //       consumerTransport.on(
-  //         "connect",
-  //         async ({ dtlsParameters }, callback, errback) => {
-  //           try {
-  //             // Signal local DTLS parameters to the server side transport
-  //             // see server's socket.on('connectSendWebRtcTransport', ...)
-  //             this.socket.emit("connectSendWebRtcTransport", {
-  //               transportId: consumerTransport.id,
-  //               dtlsParameters,
-  //             });
+        // https://mediasoup.org/documentation/v3/mediasoup-client/api/#transport-on-connect
+        this.consumerTransport.on(
+          "connect",
+          async ({ dtlsParameters }, callback, errback) => {
+            try {
+              // Signal local DTLS parameters to the server side transport
+              // see server's socket.on('connectWebRtcTransport', ...)
+              this.socket.emit("connectWebRtcTransport", {
+                transportId: this.consumerTransport.id,
+                dtlsParameters,
+              });
 
-  //             // Tell the transport that parameters were transmitted.
-  //             callback();
-  //           } catch (error: any) {
-  //             errback(error);
-  //           }
-  //         }
-  //       );
-  //     }
-  //   );
-  // }
+              // Tell the transport that parameters were transmitted.
+              callback();
+            } catch (error: any) {
+              errback(error);
+            }
+          }
+        );
+      }
+    );
+  }
+
+  // Producer
+  private async produceMedia(type: MediaType) {
+    try {
+      let producer!: Producer;
+      let track;
+
+      // canSendMic: this._mediasoupDevice.canProduce("audio"),
+      // canSendWebcam: this._mediasoupDevice.canProduce("video"),
+      switch (type) {
+        case MediaType.AUDIO:
+          if (!this.mediasoupDevice.canProduce(MediaType.AUDIO)) {
+            console.error("enableMic() | cannot produce audio");
+            return;
+          }
+          track = this.streamContext.stream.getAudioTracks()[0].clone();
+
+          this.micProducer = await this.producerTransport.produce({
+            track,
+            codecOptions: {
+              opusStereo: true,
+              opusDtx: true,
+              opusFec: true,
+              opusNack: true,
+            },
+            appData: { mediaType: type },
+          });
+          producer = this.micProducer;
+
+          break;
+
+        case MediaType.VIDEO:
+          if (!this.mediasoupDevice.canProduce(MediaType.VIDEO)) {
+            console.error("enableMic() | cannot produce audio");
+            return;
+          }
+
+          track = this.streamContext.stream.getVideoTracks()[0].clone();
+          this.webcamProducer = await this.producerTransport.produce({
+            track,
+            encodings: [
+              { maxBitrate: 100000 },
+              { maxBitrate: 300000 },
+              { maxBitrate: 900000 },
+            ],
+            codecOptions: {
+              videoGoogleStartBitrate: 1000,
+            },
+            appData: { mediaType: type },
+          });
+          producer = this.webcamProducer;
+          break;
+
+        default:
+          break;
+      }
+
+      this.context.dispatch({
+        type: RoomStateType.ADD_PRODUCER,
+        payload: { type, producer },
+      });
+
+      producer?.on("transportclose", () => {
+        // this._webcamProducer = null;
+      });
+
+      producer?.on("trackended", () => {
+        // store.dispatch(
+        //   requestActions.notify({
+        //     type: "error",
+        //     text: "Webcam disconnected!",
+        //   })
+        // );
+        // this.disableWebcam().catch(() => {});
+      });
+    } catch (error) {
+      console.log("media error", error);
+    }
+  }
+
+  // Consumer
+  async consumerMedia(data: {
+    producerId: string;
+    peerInfo: PeerInfo;
+    type: string;
+  }) {
+    console.log("consumerMedia >>>>>>", data);
+    const { producerId } = data;
+    this.socket.emit(
+      "createConsumer",
+      {
+        producerId,
+        rtpCapabilities: this.mediasoupDevice.rtpCapabilities,
+        consumerTransportId: this.consumerTransport.id,
+      },
+      async (params: any) => {
+        const consumer = await this.consumerTransport.consume({
+          id: params.id,
+          producerId: params.producerId,
+          kind: params.kind,
+          rtpParameters: params.rtpParameters,
+          appData: { peerId: data?.peerInfo.id, type: data?.type },
+        });
+
+        this.context.dispatch({
+          type: RoomStateType.ADD_CONSUMER,
+          payload: consumer,
+        });
+        // Render the remote video track into a HTML video element.
+        // const { track } = consumer;
+
+        // videoElem.srcObject = new MediaStream([ track ]);
+
+        // Resume paused server consumer
+        this.socket.emit("resumeConsumer", { consumerId: params?.id });
+
+        this.toast("new consumer");
+      }
+    );
+  }
+
+  private initializeSocket() {
+    this.socket.on(
+      "newProducers",
+      async (
+        producers: {
+          producerId: string;
+          peerInfo: PeerInfo;
+          type: string;
+        }[]
+      ) => {
+        if (producers.length > 0) {
+          for (const producer of producers) {
+            await this.consumerMedia(producer);
+          }
+        }
+      }
+    );
+  }
 }

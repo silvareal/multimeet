@@ -1,3 +1,4 @@
+import { BASE_URL } from "constants/env.constant";
 import React from "react";
 // import { BASE_URL } from "utils/VideoUtils";
 

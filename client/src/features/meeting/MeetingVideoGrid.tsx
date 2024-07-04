@@ -1,18 +1,24 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useContext, useLayoutEffect, useRef, useState } from "react";
 import "./MeetingVideoGrid.css";
 import { Icon } from "@iconify-icon/react/dist/iconify.js";
 import clsx from "clsx";
 import MeetingVideoContainer from "./MeetingVideoContainer";
+import { RoomStateContext } from "providers/RoomProvider";
+import { MediaType } from "types/room.type";
 
-export default function MeetingVideoGrid({
-  videosStreams,
-  transformPerspective,
-}: any) {
+export default function MeetingVideoGrid({ transformPerspective }: any) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const roomStateContext = useContext(RoomStateContext);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const mediaTracks: any = [
+    { peer: roomStateContext.roomState.authPeer, isMe: true },
+  ];
+
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  const totalPages = Math.ceil(videosStreams.length / itemsPerPage);
+  const totalPages = Math.ceil(mediaTracks.length / itemsPerPage);
 
   const resizeVideos = () => {
     const container = containerRef.current;
@@ -55,7 +61,7 @@ export default function MeetingVideoGrid({
     return () => {
       window.removeEventListener("resize", resizeVideos);
     };
-  }, [videosStreams, transformPerspective, currentPage]);
+  }, [mediaTracks, transformPerspective, currentPage]);
 
   useLayoutEffect(() => {
     const resizeObserver = new ResizeObserver(resizeVideos);
@@ -67,7 +73,7 @@ export default function MeetingVideoGrid({
     };
   }, []);
 
-  const currentVideosStreams = videosStreams.slice(
+  const currentVideosStreams = mediaTracks.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -82,20 +88,31 @@ export default function MeetingVideoGrid({
 
   const isLastPage = totalPages === currentPage;
   const isFirstPage = currentPage === 1;
-
+  console.log({ roomStateContext });
   return (
     <div
       ref={containerRef}
       className="h-full w-full flex justify-center items-center flex-wrap gap-2"
     >
-      {currentVideosStreams.map((videoStream: any) => (
+      {currentVideosStreams.map(() => (
         <MeetingVideoContainer
-          data-fullName="Sylvernus Akubo"
-          // videoStream={videoStream}
-          avatar="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRXxfn1j1vKFy8yJeBGl2AS6Dcah-lKgHofg&s"
+          data-fullName="Me"
+          videoTrack={
+            roomStateContext?.roomState?.producers?.find(
+              (producer) => producer.type === MediaType.VIDEO
+            )?.producer?.track || null
+          }
+          audioTrack={
+            roomStateContext?.roomState?.producers?.find(
+              (producer) => producer.type === MediaType.AUDIO
+            )?.producer?.track || null
+          }
+          mute={true}
+          avatar={roomStateContext?.roomState?.authPeer?.avatar || ""}
+          mic={roomStateContext?.roomState?.authPeer?.peerAudio || false}
+          camera={roomStateContext?.roomState?.authPeer?.peerVideo || false}
         />
       ))}
-
       {totalPages > 1 && (
         <div className="absolute w-full flex justify-between top h-20 px-5">
           <div>

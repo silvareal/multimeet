@@ -1,26 +1,33 @@
 import { useContext, useEffect } from "react";
 
-import { StreamContext } from "../providers/StreamProvider";
-import { RoomClient } from "../configs/room-client.config";
-import { RoomContext } from "../providers/RoomProvider";
 import { PeerInfo } from "../types/room.type";
+import { RoomClient } from "../configs/room-client.config";
+import { RoomClientContext } from "../providers/RoomClientProvider";
+import { RoomStateContext } from "providers/RoomProvider";
+import { StreamContext } from "providers/StreamProvider";
 
 export default function useMeeting(roomId: string): {
   join: (peerInfo: PeerInfo) => Promise<void>;
+  getLocalStream: (callback: (stream: MediaStream) => void) => void;
 } {
+  const roomClientContext = useContext(RoomClientContext);
+  const roomStateContext = useContext(RoomStateContext);
   const streamContext = useContext(StreamContext);
-  const roomContext = useContext(RoomContext);
 
-  const room = new RoomClient(roomId, streamContext);
+  const room = new RoomClient(roomId, roomStateContext, streamContext);
 
   useEffect(() => {
-    roomContext.setRoomClient(room);
-    room.getLocalStream();
+    roomClientContext?.setRoomClient(room);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function join(peerInfo: PeerInfo) {
     return room.join(peerInfo);
   }
 
-  return { join };
+  async function getLocalStream(callback: (stream: MediaStream) => void) {
+    return room.getLocalStream(callback);
+  }
+
+  return { join, getLocalStream };
 }

@@ -3,7 +3,8 @@ import { useEffect, useRef } from "react";
 
 type MeetingVideoContainerProps = {
   name?: string;
-  videoStream?: MediaStream;
+  audioTrack: MediaStreamTrack | null;
+  videoTrack: MediaStreamTrack | null;
   className?: string;
   mute?: boolean;
   avatar: string;
@@ -13,18 +14,43 @@ type MeetingVideoContainerProps = {
 export default function MeetingVideoContainer(
   props: MeetingVideoContainerProps
 ) {
-  const { videoStream, avatar, mute, camera, mic, name, className, ...rest } =
-    props;
+  const {
+    audioTrack,
+    videoTrack,
+    avatar,
+    mute,
+    camera,
+    mic,
+    name,
+    className,
+    ...rest
+  } = props;
   const refVideo = useRef<HTMLVideoElement>(null);
+  const refAudio = useRef<HTMLAudioElement>(null);
+
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (videoStream) {
+    if (videoTrack) {
       if (!refVideo.current) return;
-      refVideo.current.srcObject = videoStream;
+      const stream = new MediaStream();
+      stream.addTrack(videoTrack);
+
+      // console.log({ stream });
+
+      refVideo.current.srcObject = stream;
       refVideo.current.autoplay = true;
     }
-  }, [videoStream]);
+
+    if (audioTrack) {
+      if (!refAudio.current) return;
+      const stream = new MediaStream();
+      stream.addTrack(audioTrack);
+      refAudio.current.srcObject = stream;
+      refAudio.current?.play();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoTrack, audioTrack]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -46,6 +72,8 @@ export default function MeetingVideoContainer(
         <div></div>
         <div></div>
       </div>
+      <audio ref={refAudio} autoPlay muted={mute} controls={false} />
+
       {/* <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRXxfn1j1vKFy8yJeBGl2AS6Dcah-lKgHofg&s" /> */}
       <video
         className={clsx(!camera && "z-[-1]")}

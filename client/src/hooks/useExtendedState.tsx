@@ -5,7 +5,7 @@ export default function useExtendedState<T>(
 ): [T, Dispatch<SetStateAction<T>>, () => Promise<T>] {
   const [state, setState] = React.useState<T>(initialState && initialState);
   const getLatestState = () => {
-    return new Promise<T>((resolve, reject) => {
+    return new Promise<T>((resolve) => {
       setState((s) => {
         resolve(s);
         return s;

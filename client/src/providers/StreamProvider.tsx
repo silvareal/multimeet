@@ -1,6 +1,8 @@
 import { useState, createContext } from "react";
 
 export default function StreamProvider({ children }: any) {
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-expect-error
   const [stream, setStream] = useState<MediaStream>(null);
 
   return (
@@ -12,6 +14,8 @@ export default function StreamProvider({ children }: any) {
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-expect-error
 export const StreamContext = createContext<StreamContextType>(null);
 
 export type StreamContextType = {

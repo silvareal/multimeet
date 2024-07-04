@@ -5,15 +5,15 @@ import { Icon } from "@iconify-icon/react/dist/iconify.js";
 
 import useMeeting from "../../hooks/useMeeting";
 import MeetingVideoContainer from "../../features/meeting/MeetingVideoContainer";
-import { useContext, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import { StreamContext } from "../../providers/StreamProvider";
 import { getGravatarUrl } from "../../utils/string.utils";
 
 export default function MeetingLobby() {
   const { id } = useParams<{ id: string }>() as { id: string };
-  const streamContext = useContext(StreamContext);
-  const { join } = useMeeting(id);
+
+  const [stream, setStream] = useState<MediaStream>();
+  const { join, getLocalStream } = useMeeting(id);
 
   const formik = useFormik({
     initialValues: {
@@ -39,7 +39,7 @@ export default function MeetingLobby() {
           avatar: values.avatar,
           peerVideo: values.peerVideo,
           peerAudio: values.peerAudio,
-          peerRaised_hand: false,
+          peerRaisedHand: false,
           peerScreenRecord: false,
           peerScreenShare: false,
         });
@@ -51,27 +51,19 @@ export default function MeetingLobby() {
 
   const toggleCamera = () => {
     // https://developer.mozilla.org/en-US/docs/Web/API/MediaStream/getVideoTracks
-    if (streamContext.stream !== undefined) {
-      streamContext.stream.getVideoTracks()[0].enabled =
-        !streamContext.stream.getVideoTracks()[0].enabled;
+    if (stream !== undefined) {
+      stream.getVideoTracks()[0].enabled = !stream.getVideoTracks()[0].enabled;
 
-      formik.setFieldValue(
-        "peerVideo",
-        !!streamContext.stream.getVideoTracks()[0].enabled
-      );
+      formik.setFieldValue("peerVideo", !!stream.getVideoTracks()[0].enabled);
     }
   };
 
   const toggleAudio = () => {
     // https://developer.mozilla.org/en-US/docs/Web/API/MediaStream/getAudioTracks
-    if (streamContext.stream !== undefined) {
-      streamContext.stream.getAudioTracks()[0].enabled =
-        !streamContext.stream.getAudioTracks()[0].enabled;
+    if (stream !== undefined) {
+      stream.getAudioTracks()[0].enabled = !stream.getAudioTracks()[0].enabled;
 
-      formik.setFieldValue(
-        "peerAudio",
-        !!streamContext.stream.getAudioTracks()[0].enabled
-      );
+      formik.setFieldValue("peerAudio", !!stream.getAudioTracks()[0].enabled);
     }
   };
 
@@ -95,8 +87,14 @@ export default function MeetingLobby() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [streamContext.stream, formik.values.peerAudio, formik.values.peerVideo]
+    [stream, formik.values.peerAudio, formik.values.peerVideo]
   );
+
+  useEffect(() => {
+    getLocalStream((stream) => {
+      setStream(stream);
+    });
+  }, []);
 
   return (
     <div className="container max-w-6xl mx-auto h-[100vh] flex items-center">
@@ -106,15 +104,16 @@ export default function MeetingLobby() {
             className="w-full h-[450px]"
             name={formik.values.peerName}
             mute={true}
+            audioTrack={stream?.getAudioTracks()?.[0] || null}
+            videoTrack={stream?.getVideoTracks()?.[0] || null}
             avatar={formik.values.avatar}
-            videoStream={streamContext.stream}
             mic={formik.values.peerAudio}
             camera={formik.values.peerVideo}
           />
           <div className="flex justify-between gap-5 mt-2 absolute bottom-3">
             {mainActions?.map((action, index) => (
               <button
-                disabled={!streamContext.stream}
+                disabled={!stream}
                 className={"icon-button"}
                 key={index}
                 onClick={action.onClick}
@@ -139,11 +138,7 @@ export default function MeetingLobby() {
             className="text-input"
             placeholder="name"
           />
-          <button
-            disabled={!streamContext.stream}
-            type="submit"
-            className="button"
-          >
+          <button disabled={!stream} type="submit" className="button">
             <Icon
               icon="icon-park-solid:video-conference"
               style={{ color: "black" }}
