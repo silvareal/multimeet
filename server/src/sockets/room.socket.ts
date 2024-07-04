@@ -21,7 +21,6 @@ export async function RoomSocket(
   try {
     mediasoupWorkers = await startMediasoup();
   } catch (err) {
-    console.log({ err });
     logger.error("mediasoup failed to start", err);
     throw err;
   }
@@ -39,7 +38,7 @@ export async function RoomSocket(
   const RoomNamespace = io.of("/rooms");
 
   RoomNamespace.on("connection", (socket: Socket) => {
-    socket.on("room:create", async ({ roomId }) => {
+    socket.on("room:create", async (roomId) => {
       let roomExist = rooms.has(roomId);
       if (roomExist) {
         logger.info("Room already created", roomId);
@@ -54,21 +53,25 @@ export async function RoomSocket(
       "room:join",
       async (roomInfo: { roomId: string; peerInfo: PeerInfo }, callback) => {
         const { roomId, peerInfo } = roomInfo;
+        socket.join(roomId);
 
         socket.data.roomId = roomId;
-        let room = rooms.get(roomId);
+        let room = rooms.get(socket.data.roomId);
 
         if (!room) {
           callback({ error: "Room doesn't exist" });
         } else {
+          room.socket = socket;
+
           room.addPeer(
-            socket.data.roomId,
             new Peer(socket.id, {
               peerInfo: { ...peerInfo, id: socket.id },
               roomId,
             })
           );
-          callback({ response: roomId });
+          const peer = await room.getPeer(socket.id);
+
+          callback({ response: peer?.getPeerInfo() });
           logger.info("peer joined Room", roomId);
         }
       }
@@ -79,7 +82,7 @@ export async function RoomSocket(
       logger.info("Get RouterRtpCapabilities");
 
       try {
-        const getRouterRtpCapabilities = room?.getRouterRtpCapabilities();
+        const getRouterRtpCapabilities = await room?.getRouterRtpCapabilities();
         logger.info("Get RouterRtpCapabilities callback", {
           callback: getRouterRtpCapabilities,
         });
@@ -95,28 +98,25 @@ export async function RoomSocket(
 
     // Client emits a request to create server side Transport
     // We need to differentiate between the producer and consumer transports
-    socket.on(
-      "createWebRtcTransport",
-      async ({ sender = false }, callback: any) => {
-        const room = rooms.get(socket.data?.roomId);
-        if (room) {
-          const transport = await room?.createWebRtcTransport(sender);
+    socket.on("createWebRtcTransport", async (callback: any) => {
+      const room = rooms.get(socket.data?.roomId);
+      if (room) {
+        const transport = await room?.createWebRtcTransport();
 
-          callback({
-            id: transport?.id,
-            iceParameters: transport?.iceParameters,
-            iceCandidates: transport?.iceCandidates,
-            dtlsParameters: transport?.dtlsParameters,
-          });
-        }
+        callback({
+          id: transport?.id,
+          iceParameters: transport?.iceParameters,
+          iceCandidates: transport?.iceCandidates,
+          dtlsParameters: transport?.dtlsParameters,
+        });
       }
-    );
+    });
 
     socket.on(
-      "connectSendWebRtcTransport",
+      "connectWebRtcTransport",
       async ({ transportId, dtlsParameters }) => {
         const room = rooms.get(socket.data?.roomId);
-        room?.connectSendWebRtcTransport(transportId, dtlsParameters);
+        room?.connectWebRtcTransport(transportId, dtlsParameters);
       }
     );
 
@@ -124,6 +124,8 @@ export async function RoomSocket(
       "createProducer",
       async ({ transportId, kind, rtpParameters, appData }, callback) => {
         const room = rooms.get(socket.data?.roomId);
+
+        // Optimization: Create a server-side Consumer for each Peer.
 
         const producer = await room?.createPeerProducer(transportId, {
           kind,
@@ -134,6 +136,51 @@ export async function RoomSocket(
         callback({ id: producer?.id });
       }
     );
+
+    socket.on(
+      "createConsumer",
+      async (
+        { producerId, rtpCapabilities, consumerTransportId },
+        callback
+      ) => {
+        const room = rooms.get(socket.data?.roomId);
+
+        const consumer = await room?.createPeerConsumer({
+          producerId,
+          rtpCapabilities,
+          consumerTransportId,
+        });
+
+        // from the consumer extract the following params
+        // to send back to the Client
+        const params = {
+          producerId,
+          id: consumer?.id,
+          kind: consumer?.kind,
+          rtpParameters: consumer?.rtpParameters,
+          serverConsumerId: consumer?.id,
+        };
+
+        callback({ ...params });
+      }
+    );
+
+    socket.on("getProducers", async () => {
+      // if (!rooms.has(socket.data?.roomId)) return;
+      const room = rooms.get(socket.data?.roomId);
+
+      logger.debug("Get producers");
+
+      // send all the current producer to newly joined member
+      const producers = await room?.getPeerProducers();
+
+      socket.emit("newProducers", producers);
+    });
+
+    socket.on("resumeConsumer", ({ consumerId }) => {
+      const room = rooms.get(socket.data?.roomId);
+      room?.resumeConsumer(consumerId);
+    });
 
     socket.on("disconnect", () => {
       console.log("user disconnected");

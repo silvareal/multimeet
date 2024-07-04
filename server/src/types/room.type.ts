@@ -10,7 +10,7 @@ export interface PeerInfo {
   avatar: string;
   peerVideo: boolean;
   peerAudio: boolean;
-  peerRaised_hand: boolean;
+  peerRaisedHand: boolean;
   peerScreenRecord: boolean;
   peerScreenShare: boolean;
 }
