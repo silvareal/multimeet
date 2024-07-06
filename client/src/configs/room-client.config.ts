@@ -1,18 +1,17 @@
 import * as mediaSoupClient from "mediasoup-client";
-
-import { roomSocket } from "../constants/socket.constant";
-import { MediaType, PeerInfo, RoomStateType } from "../types/room.type";
-import { toast } from "react-toastify";
-import { RoomStateContextType } from "providers/RoomProvider";
-import { StreamContextType } from "providers/StreamProvider";
 import { Producer } from "mediasoup-client/lib/Producer";
+
+import toast from "./toast.config";
+import { roomSocket } from "../constants/socket.constant";
+import { StreamContextType } from "providers/StreamProvider";
+import { RoomStateContextType } from "providers/RoomProvider";
+import { MediaType, PeerInfo, RoomStateType } from "../types/room.type";
 
 export class RoomClient {
   toast;
   socket;
   roomId;
   context;
-  consumers;
   streamContext: StreamContextType;
 
   private producerTransport!: mediaSoupClient.types.Transport;
@@ -34,7 +33,6 @@ export class RoomClient {
     this.socket = roomSocket;
     this.context = roomStateContext;
     this.streamContext = streamContext;
-    this.consumers = new Map();
   }
 
   async join(peerInfo: PeerInfo) {
@@ -223,11 +221,11 @@ export class RoomClient {
           // see connectSendTransport() below
           this.producerTransport.on(
             "produce",
-            async (parameters, callback, errBack) => {
+            (parameters, callback, errBack) => {
               try {
                 // Signal parameters to the server side transport and retrieve the id of
                 // the server side new producer
-                await this.socket.emit(
+                this.socket.emit(
                   "createProducer",
                   {
                     transportId: this.producerTransport.id,
@@ -239,8 +237,6 @@ export class RoomClient {
                     // Let's assume the server included the created producer id in the response
                     // data object.
                     callback({ id });
-
-                    // this.socket.emit("getProducers");
                   }
                 );
               } catch (error: any) {
@@ -251,6 +247,9 @@ export class RoomClient {
 
           await this.produceMedia(MediaType.AUDIO);
           await this.produceMedia(MediaType.VIDEO);
+
+          // get all producers from the server side and create a consumer
+          this.socket.emit("getProducers");
         }
       }
     );
@@ -260,11 +259,12 @@ export class RoomClient {
   private async createRecvTransport() {
     this.socket.emit(
       "createWebRtcTransport",
-      (
+      async (
         parameters: mediaSoupClient.types.TransportOptions<mediaSoupClient.types.AppData>
       ) => {
         // https://mediasoup.org/documentation/v3/mediasoup-client/api/#device-createRecvTransport
         // Creates a new WebRTC transport to receive media. The transport must be previously created in the mediasoup router via
+        console.log({ parameters });
         this.consumerTransport = this.mediasoupDevice.createRecvTransport({
           ...parameters,
           dtlsParameters: {
@@ -276,6 +276,8 @@ export class RoomClient {
           },
         });
 
+        console.log({ consumerTransport: this.consumerTransport });
+
         // https://mediasoup.org/documentation/v3/mediasoup-client/api/#transport-on-connect
         this.consumerTransport.on(
           "connect",
@@ -284,7 +286,7 @@ export class RoomClient {
               // Signal local DTLS parameters to the server side transport
               // see server's socket.on('connectWebRtcTransport', ...)
               this.socket.emit("connectWebRtcTransport", {
-                transportId: this.consumerTransport.id,
+                transportId: parameters.id,
                 dtlsParameters,
               });
 
@@ -384,8 +386,13 @@ export class RoomClient {
     peerInfo: PeerInfo;
     type: string;
   }) {
-    console.log("consumerMedia >>>>>>", data);
-    const { producerId } = data;
+    const { producerId, peerInfo, type } = data;
+
+    console.log({
+      producerId,
+      consumerTransportId: this.consumerTransport.id,
+    });
+
     this.socket.emit(
       "createConsumer",
       {
@@ -399,22 +406,22 @@ export class RoomClient {
           producerId: params.producerId,
           kind: params.kind,
           rtpParameters: params.rtpParameters,
-          appData: { peerId: data?.peerInfo.id, type: data?.type },
+          appData: { peerId: peerInfo.id, type: type },
+        });
+
+        this.context.dispatch({
+          type: RoomStateType.ADD_PEER,
+          payload: peerInfo,
         });
 
         this.context.dispatch({
           type: RoomStateType.ADD_CONSUMER,
           payload: consumer,
         });
-        // Render the remote video track into a HTML video element.
-        // const { track } = consumer;
-
-        // videoElem.srcObject = new MediaStream([ track ]);
-
-        // Resume paused server consumer
-        this.socket.emit("resumeConsumer", { consumerId: params?.id });
 
         this.toast("new consumer");
+
+        this.socket.emit("resumeConsumer", { consumerId: params?.id });
       }
     );
   }
@@ -429,6 +436,7 @@ export class RoomClient {
           type: string;
         }[]
       ) => {
+        console.log("newProducers");
         if (producers.length > 0) {
           for (const producer of producers) {
             await this.consumerMedia(producer);
@@ -436,5 +444,10 @@ export class RoomClient {
         }
       }
     );
+
+    this.socket.on("peerJoined", async (peer: PeerInfo) => {
+      // @ts-ignore
+      this.toast.userJoined({ ...peer }, { autoClose: false });
+    });
   }
 }

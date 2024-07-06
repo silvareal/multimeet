@@ -70,6 +70,7 @@ export async function RoomSocket(
             })
           );
           const peer = await room.getPeer(socket.id);
+          socket.to(roomId).emit("peerJoined", peer);
 
           callback({ response: peer?.getPeerInfo() });
           logger.info("peer joined Room", roomId);
@@ -102,6 +103,7 @@ export async function RoomSocket(
       const room = rooms.get(socket.data?.roomId);
       if (room) {
         const transport = await room?.createWebRtcTransport();
+        console.log({ transport: transport?.id });
 
         callback({
           id: transport?.id,
@@ -126,7 +128,6 @@ export async function RoomSocket(
         const room = rooms.get(socket.data?.roomId);
 
         // Optimization: Create a server-side Consumer for each Peer.
-
         const producer = await room?.createPeerProducer(transportId, {
           kind,
           rtpParameters,

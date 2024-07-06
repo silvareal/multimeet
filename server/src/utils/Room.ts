@@ -50,6 +50,8 @@ export default class Room {
         enableUdp: true,
         enableTcp: false,
       });
+      const peer = await this.getPeer(this.socket.id);
+      await peer?.addTransport(transport);
 
       transport.on("dtlsstatechange", (dtlsState) => {
         if (dtlsState === "closed") {
@@ -78,9 +80,6 @@ export default class Room {
       transport.on("@close", () => {
         console.log("transport closed");
       });
-
-      const peer = await this.getPeer(this.socket.id);
-      await peer?.addTransport(transport);
 
       return transport;
     } catch (error) {
@@ -120,8 +119,6 @@ export default class Room {
     }
     peer?.addProducer(producer);
 
-    // console.log({ socketId: this.socket.id, peer: peer?.getPeerInfo() });
-
     // Inform all client except you about the new producer
     this.socket.to(this.roomId).emit("newProducers", [
       {
@@ -150,7 +147,10 @@ export default class Room {
       return;
     }
     const peer = await this.getPeer(this.socket.id);
+
     const peerConsumerTransport = peer?.getTransport(consumerTransportId);
+    console.log({ peerConsumerTransport });
+
     const consumer = await peerConsumerTransport?.consume({
       producerId,
       rtpCapabilities, // Enable NACK for OPUS.
@@ -188,13 +188,15 @@ export default class Room {
     let producers: { producerId: string; peerInfo: PeerInfo; type: unknown }[] =
       [];
     this.peers.forEach((peer) => {
-      peer.producers.forEach((producer) => {
-        producers.push({
-          producerId: producer.id,
-          peerInfo: peer.getPeerInfo(),
-          type: producer.appData.mediaType,
+      if (peer.id !== this.socket.id) {
+        peer.producers.forEach((producer) => {
+          producers.push({
+            producerId: producer.id,
+            peerInfo: peer.getPeerInfo(),
+            type: producer.appData.mediaType,
+          });
         });
-      });
+      }
     });
     return producers;
   }

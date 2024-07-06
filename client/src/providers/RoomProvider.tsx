@@ -16,8 +16,13 @@ const reducer = (state: RoomState, action: RoomStateAction): RoomState => {
       return { ...state, producers: [...state.producers, action.payload] };
     case RoomStateType.ADD_CONSUMER:
       return { ...state, consumers: [...state.consumers, action.payload] };
+
     case RoomStateType.ADD_PEER:
+      if (state.peers.find((peer) => peer.id === action.payload.id)) {
+        return state;
+      }
       return { ...state, peers: [...state.peers, action.payload] };
+
     default:
       return state;
   }

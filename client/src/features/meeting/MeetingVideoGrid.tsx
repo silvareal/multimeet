@@ -1,19 +1,37 @@
-import { useContext, useLayoutEffect, useRef, useState } from "react";
-import "./MeetingVideoGrid.css";
-import { Icon } from "@iconify-icon/react/dist/iconify.js";
 import clsx from "clsx";
+import { useContext, useLayoutEffect, useRef, useState } from "react";
+import { Consumer } from "mediasoup-client/lib/Consumer";
+import { Producer } from "mediasoup-client/lib/Producer";
+import { Icon } from "@iconify-icon/react/dist/iconify.js";
+
+import "./MeetingVideoGrid.css";
 import MeetingVideoContainer from "./MeetingVideoContainer";
 import { RoomStateContext } from "providers/RoomProvider";
-import { MediaType } from "types/room.type";
+import { MediaType, PeerInfo } from "types/room.type";
 
 export default function MeetingVideoGrid({ transformPerspective }: any) {
   const containerRef = useRef<HTMLDivElement>(null);
   const roomStateContext = useContext(RoomStateContext);
 
+  const otherPeers = roomStateContext.roomState.peers.map((peer) => ({
+    peer,
+    isMe: false,
+    consumers: roomStateContext.roomState.consumers.filter(
+      (consumer) => consumer.appData.peerId === peer.id
+    ),
+  }));
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const mediaTracks: any = [
-    { peer: roomStateContext.roomState.authPeer, isMe: true },
+    {
+      peer: roomStateContext.roomState.authPeer,
+      isMe: true,
+      producers: roomStateContext.roomState.producers || [],
+    },
+    ...otherPeers,
   ];
+
+  console.log({ roomStateContext });
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -73,7 +91,12 @@ export default function MeetingVideoGrid({ transformPerspective }: any) {
     };
   }, []);
 
-  const currentVideosStreams = mediaTracks.slice(
+  const currentVideosStreams: {
+    peer: PeerInfo;
+    isMe: false;
+    consumers: Consumer[] | undefined;
+    producers: { type: MediaType; producer: Producer }[] | undefined;
+  }[] = mediaTracks.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -88,29 +111,37 @@ export default function MeetingVideoGrid({ transformPerspective }: any) {
 
   const isLastPage = totalPages === currentPage;
   const isFirstPage = currentPage === 1;
-  console.log({ roomStateContext });
+  // console.log({ roomStateContext });
   return (
     <div
       ref={containerRef}
       className="h-full w-full flex justify-center items-center flex-wrap gap-2"
     >
-      {currentVideosStreams.map(() => (
+      {currentVideosStreams.map((mediaTracks) => (
         <MeetingVideoContainer
-          data-fullName="Me"
+          data-fullName={mediaTracks?.peer?.peerName}
           videoTrack={
-            roomStateContext?.roomState?.producers?.find(
-              (producer) => producer.type === MediaType.VIDEO
-            )?.producer?.track || null
+            (mediaTracks?.isMe
+              ? mediaTracks?.producers?.find(
+                  (producer) => producer.type === MediaType.VIDEO
+                )?.producer?.track
+              : mediaTracks?.consumers?.find(
+                  (consumer) => consumer.kind === MediaType.VIDEO
+                )?.track) || null
           }
           audioTrack={
-            roomStateContext?.roomState?.producers?.find(
-              (producer) => producer.type === MediaType.AUDIO
-            )?.producer?.track || null
+            (mediaTracks?.isMe
+              ? mediaTracks?.producers?.find(
+                  (producer) => producer.type === MediaType.AUDIO
+                )?.producer?.track
+              : mediaTracks?.consumers?.find(
+                  (consumer) => consumer.kind === MediaType.AUDIO
+                )?.track) || null
           }
           mute={true}
-          avatar={roomStateContext?.roomState?.authPeer?.avatar || ""}
-          mic={roomStateContext?.roomState?.authPeer?.peerAudio || false}
-          camera={roomStateContext?.roomState?.authPeer?.peerVideo || false}
+          avatar={mediaTracks?.peer?.avatar || ""}
+          mic={mediaTracks?.peer?.peerAudio || false}
+          camera={mediaTracks?.peer?.peerVideo || false}
         />
       ))}
       {totalPages > 1 && (
