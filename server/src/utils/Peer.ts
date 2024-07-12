@@ -14,6 +14,7 @@ import {
 export class Peer {
   id;
   avatar;
+  peerInfo;
   peerName;
   userAgent;
   peerVideo;
@@ -34,6 +35,7 @@ export class Peer {
     this.consumers = new Map<string, Consumer<AppData>>();
     this.producers = new Map<string, Producer<AppData>>();
 
+    this.peerInfo = data.peerInfo;
     this.avatar = data.peerInfo.avatar;
     this.userAgent = data.peerInfo.userAgent;
     this.peerName = data.peerInfo.peerName;
@@ -48,6 +50,23 @@ export class Peer {
 
   getTransport(transportId: string) {
     return this.transports.get(transportId);
+  }
+
+  getConsumerTransport() {
+    const transport = Array.from(this.transports.values()).find(
+      (transport) => transport.appData.consuming
+    );
+    if (!transport) throw new Error("Failed to get transport");
+    return transport;
+  }
+
+  getProducerTransport() {
+    const transport = Array.from(this.transports.values()).find(
+      (transport) => transport.appData.producing
+    );
+    if (!transport) throw new Error("Failed to get transport");
+
+    return transport;
   }
 
   delTransport(transportId: string) {

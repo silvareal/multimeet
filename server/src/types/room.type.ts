@@ -19,13 +19,16 @@ export interface Peer {
   roomId: string;
   peerInfo: PeerInfo;
 }
-export interface PeerActionStatusConfig {
-  room_id: string;
-  element: "name" | "video" | "hand" | "audio" | "screen" | "rec";
-  status: string | boolean;
-}
 
 export type MediasoupWorker = {
   worker: Worker;
   router: Router;
 };
+
+export enum PeerActionTypeEnum {
+  video = "video",
+  audio = "audio",
+  screenShare = "screenShare",
+  raiseHand = "raiseHand",
+  rec = "rec",
+}

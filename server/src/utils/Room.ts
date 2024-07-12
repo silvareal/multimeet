@@ -3,6 +3,7 @@ import { Socket } from "socket.io";
 import {
   AppData,
   DtlsParameters,
+  Producer,
   ProducerOptions,
   Router,
   RtpCapabilities,
@@ -12,7 +13,7 @@ import {
 import { config } from "../config/medisoup.config";
 import { Peer } from "./Peer";
 import logger from "../helpers/logger.helper";
-import { PeerInfo } from "../types/room.type";
+import { PeerActionTypeEnum, PeerInfo } from "../types/room.type";
 
 export default class Room {
   roomId;
@@ -40,7 +41,10 @@ export default class Room {
   }
 
   // Creating sender/receiver transports ...
-  async createWebRtcTransport(): Promise<WebRtcTransport<AppData>> {
+  async createWebRtcTransport(data: {
+    producing: boolean;
+    consuming: boolean;
+  }): Promise<WebRtcTransport<AppData>> {
     try {
       // https://mediasoup.org/documentation/v3/mediasoup/api/#router-createWebRtcTransport
       // Creates a new WebRTC transport.
@@ -49,6 +53,7 @@ export default class Room {
         ...config.mediasoup.webRtcTransport,
         enableUdp: true,
         enableTcp: false,
+        appData: { ...data },
       });
       const peer = await this.getPeer(this.socket.id);
       await peer?.addTransport(transport);
@@ -101,12 +106,11 @@ export default class Room {
     await transport?.connect({ dtlsParameters });
   }
 
-  async createPeerProducer(
-    transportId: string,
-    parameters: ProducerOptions<AppData>
-  ) {
+  async createProducer(parameters: ProducerOptions<AppData>) {
     const peer = await this.getPeer(this.socket.id);
-    const transport = peer?.getTransport(transportId);
+    if (!peer) return;
+
+    const transport = peer?.getProducerTransport();
 
     // https://mediasoup.org/documentation/v3/mediasoup/api/#transport-produce
     // Instructs the router to receive audio or video RTP (or SRTP depending on
@@ -117,28 +121,71 @@ export default class Room {
       logger.error("Failed to create producer");
       return;
     }
+
     peer?.addProducer(producer);
 
     // Inform all client except you about the new producer
     this.socket.to(this.roomId).emit("newProducers", [
       {
         producerId: producer?.id,
-        peerInfo: peer?.getPeerInfo(),
-        type: producer?.appData?.mediaType,
+        peerInfo: peer.getPeerInfo(),
+        type: producer.appData.mediaType,
+        appData: { type: producer?.appData?.mediaType, peerId: peer?.id },
       },
     ]);
+
+    // this.peers.forEach((consumerPeer) => {
+    //   if (consumerPeer.id !== peer.id) {
+    //     console.log({ consumerPeer });
+    //     this.createConsumer({
+    //       consumerPeer,
+    //       producerPeer: peer,
+    //       producer,
+    //     });
+    //   }
+    // });
+
     return producer;
+  }
+
+  async closeProducer(producerId: string) {
+    try {
+      const peer = await this.getPeer(this.socket.id);
+      const producer = peer?.getProducer(producerId);
+      await producer?.close();
+      peer?.delProducer(producerId);
+    } catch (error) {
+      logger.error("Failed to close producer");
+    }
+  }
+
+  async pauseProducer(producerId: string) {
+    try {
+      const peer = await this.getPeer(this.socket.id);
+      const producer = peer?.getProducer(producerId);
+      await producer?.pause();
+    } catch (error) {
+      logger.error("Failed to close producer");
+    }
+  }
+
+  async resumeProducer(producerId: string) {
+    try {
+      const peer = await this.getPeer(this.socket.id);
+      const producer = peer?.getProducer(producerId);
+      await producer?.resume();
+    } catch (error) {
+      logger.error("Failed to close producer");
+    }
   }
 
   // Creates a mediasoup Consumer for the given mediasoup Producer.
   async createPeerConsumer({
     producerId,
     rtpCapabilities,
-    consumerTransportId,
   }: {
     producerId: string;
     rtpCapabilities: RtpCapabilities;
-    consumerTransportId: string;
   }) {
     // https://mediasoup.org/documentation/v3/mediasoup/api/#router-canConsume
     // Whether the given RTP capabilities are valid to consume the given producer.
@@ -146,17 +193,24 @@ export default class Room {
       logger.error("Failed to consume");
       return;
     }
+
     const peer = await this.getPeer(this.socket.id);
 
-    const peerConsumerTransport = peer?.getTransport(consumerTransportId);
-    console.log({ peerConsumerTransport });
+    const peerConsumerTransport = peer?.getConsumerTransport();
+    const peerProducers = peer?.getProducer(producerId);
 
     const consumer = await peerConsumerTransport?.consume({
       producerId,
       rtpCapabilities, // Enable NACK for OPUS.
       enableRtx: true,
       paused: true,
+      appData: peerProducers?.appData,
     });
+
+    // consumer?.getStats();
+    // setInterval(() => {
+    //   consumer?.getStats().then((data) => console.log({ stats: data }));
+    // }, 10000);
 
     if (!consumer) return;
 
@@ -165,10 +219,69 @@ export default class Room {
     return consumer;
   }
 
+  async createConsumer({
+    consumerPeer,
+    producerPeer,
+    producer,
+  }: {
+    consumerPeer: Peer;
+    producerPeer: Peer;
+    producer: Producer;
+  }) {
+    const producerId = producer.id;
+    const rtpCapabilities = await this.getRouterRtpCapabilities();
+    // https://mediasoup.org/documentation/v3/mediasoup/api/#router-canConsume
+    // Whether the given RTP capabilities are valid to consume the given producer.
+    if (
+      !this.router.canConsume({
+        producerId,
+        rtpCapabilities,
+      })
+    ) {
+      logger.error("Failed to consume");
+      return;
+    }
+
+    const peerConsumerTransport = consumerPeer?.getConsumerTransport();
+
+    const consumer = await peerConsumerTransport?.consume({
+      producerId,
+      rtpCapabilities, // Enable NACK for OPUS.
+      enableRtx: true,
+      paused: true,
+    });
+
+    await consumer?.resume();
+
+    if (!consumer) return;
+
+    await this.socket.to(consumerPeer.id).emit("newConsumers", {
+      peerInfo: producerPeer.getPeerInfo(),
+      producerId: producer.id,
+      id: consumer?.id,
+      kind: consumer?.kind,
+      rtpParameters: consumer.rtpParameters,
+      type: consumer.type,
+      appData: {
+        ...producer.appData,
+        peerId: producerPeer.id,
+        peer: consumerPeer.getPeerInfo(),
+      },
+      producerPaused: consumer.producerPaused,
+    });
+
+    if (!consumer) return;
+
+    consumerPeer?.addConsumer(consumer);
+
+    return consumer;
+  }
+
   async resumeConsumer(consumerId: string) {
     const peer = await this.getPeer(this.socket.id);
     const consumer = peer?.getConsumer(consumerId);
-    consumer?.resume();
+
+    await consumer?.resume();
   }
 
   async getRouterRtpCapabilities() {
@@ -185,8 +298,12 @@ export default class Room {
   }
 
   async getPeerProducers() {
-    let producers: { producerId: string; peerInfo: PeerInfo; type: unknown }[] =
-      [];
+    let producers: {
+      producerId: string;
+      peerInfo: PeerInfo;
+      type: unknown;
+      appData: unknown;
+    }[] = [];
     this.peers.forEach((peer) => {
       if (peer.id !== this.socket.id) {
         peer.producers.forEach((producer) => {
@@ -194,10 +311,50 @@ export default class Room {
             producerId: producer.id,
             peerInfo: peer.getPeerInfo(),
             type: producer.appData.mediaType,
+            appData: { type: producer?.appData?.mediaType, peerId: peer?.id },
           });
         });
       }
     });
     return producers;
+  }
+
+  async sendPeerAction(type: PeerActionTypeEnum, action: any) {
+    try {
+      console.log({ type, action });
+      const peer = await this.getPeer(this.socket.id);
+      if (!peer) return;
+
+      switch (type) {
+        case PeerActionTypeEnum.video:
+          peer.peerVideo = action;
+          peer.peerInfo.peerVideo = action;
+          break;
+        case PeerActionTypeEnum.audio:
+          peer.peerAudio = action;
+          peer.peerInfo.peerAudio = action;
+          break;
+        case PeerActionTypeEnum.screenShare:
+          peer.peerScreenShare = action;
+          peer.peerInfo.peerScreenShare = action;
+          break;
+        case PeerActionTypeEnum.raiseHand:
+          peer.peerRaisedHand = action;
+          peer.peerInfo.peerRaisedHand = action;
+          break;
+        case PeerActionTypeEnum.rec:
+          peer.peerScreenRecord = action;
+          peer.peerInfo.peerScreenRecord = action;
+          break;
+      }
+
+      this.socket.broadcast.emit("peerAction", {
+        type,
+        action,
+        peer: peer.getPeerInfo(),
+      });
+    } catch (err) {
+      logger.error("Peer Status", err);
+    }
   }
 }
