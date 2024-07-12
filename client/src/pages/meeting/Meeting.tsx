@@ -7,11 +7,22 @@ import MeetingLobby from "./MeetingLobby.tsx";
 import MeetingDetails from "../../features/meeting/MeetingDetails";
 import { RoomStateContext } from "providers/RoomProvider.tsx";
 import MeetingDetailsVideoGrid from "../../features/meeting/MeetingVideoGrid";
+import useMeeting from "hooks/useMeeting.tsx";
+import { useParams } from "react-router-dom";
 
 export default function Meeting() {
-  const [videosStreams] = useState([]);
+  const { id } = useParams<{ id: string }>() as { id: string };
+
   const roomStateContext = useContext(RoomStateContext);
   const [transformPerspective, setTransformPerspective] = useState(false);
+  const { muteWebcam, unmuteWebcam } = useMeeting(id);
+
+  const handleToggleWebCam = () => {
+    console.log({ roomPeer: roomStateContext.roomState.authPeer });
+    roomStateContext.roomState.authPeer?.peerVideo
+      ? muteWebcam()
+      : unmuteWebcam();
+  };
 
   return (
     <div>
@@ -28,9 +39,11 @@ export default function Meeting() {
             >
               <div className="perspective-item">
                 <div className="flex flex-col h-full">
-                  <div className="w-full h-full flex justify-center items-center">
+                  <div
+                    className="w-full h-full flex justify-center items-center"
+                    style={{ height: "calc(100vh - 70px)" }}
+                  >
                     <MeetingDetailsVideoGrid
-                      videosStreams={videosStreams}
                       transformPerspective={transformPerspective}
                     />
                   </div>
@@ -44,7 +57,10 @@ export default function Meeting() {
                       <button className="icon-button">
                         <Icon icon="typcn:microphone" />
                       </button>
-                      <button className="icon-button">
+                      <button
+                        onClick={handleToggleWebCam}
+                        className="icon-button"
+                      >
                         <Icon icon="fa6-solid:video" />
                       </button>
                       <button className="icon-button">

@@ -9,6 +9,8 @@ import { StreamContext } from "providers/StreamProvider";
 export default function useMeeting(roomId: string): {
   join: (peerInfo: PeerInfo) => Promise<void>;
   getLocalStream: (callback: (stream: MediaStream) => void) => void;
+  muteWebcam: () => Promise<void>;
+  unmuteWebcam: () => Promise<void>;
 } {
   const roomClientContext = useContext(RoomClientContext);
   const roomStateContext = useContext(RoomStateContext);
@@ -25,9 +27,17 @@ export default function useMeeting(roomId: string): {
     return room.join(peerInfo);
   }
 
+  async function muteWebcam() {
+    return room.muteWebcam();
+  }
+
+  async function unmuteWebcam() {
+    return room.unmuteWebcam();
+  }
+
   async function getLocalStream(callback: (stream: MediaStream) => void) {
     return room.getLocalStream(callback);
   }
 
-  return { join, getLocalStream };
+  return { join, getLocalStream, muteWebcam, unmuteWebcam };
 }

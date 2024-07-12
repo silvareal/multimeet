@@ -34,6 +34,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       newestOnTop={false}
       closeOnClick
       rtl={false}
+      // stacked={true}
       pauseOnFocusLoss
       draggable
       pauseOnHover

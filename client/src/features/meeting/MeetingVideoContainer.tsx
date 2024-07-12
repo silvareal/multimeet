@@ -33,19 +33,15 @@ export default function MeetingVideoContainer(
   useEffect(() => {
     if (videoTrack) {
       if (!refVideo.current) return;
-      const stream = new MediaStream();
-      stream.addTrack(videoTrack);
-
-      // console.log({ stream });
+      const stream = new MediaStream([videoTrack]);
 
       refVideo.current.srcObject = stream;
-      refVideo.current.autoplay = true;
     }
 
     if (audioTrack) {
       if (!refAudio.current) return;
-      const stream = new MediaStream();
-      stream.addTrack(audioTrack);
+      const stream = new MediaStream([audioTrack]);
+
       refAudio.current.srcObject = stream;
       refAudio.current?.play();
     }
@@ -65,7 +61,7 @@ export default function MeetingVideoContainer(
       className={clsx(
         className && className,
         !camera && "video-off",
-        "video-container w-full"
+        "video-container w-full aspect-video"
       )}
     >
       <div>
@@ -76,7 +72,7 @@ export default function MeetingVideoContainer(
 
       {/* <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRXxfn1j1vKFy8yJeBGl2AS6Dcah-lKgHofg&s" /> */}
       <video
-        className={clsx(!camera && "z-[-1]")}
+        className={clsx(!camera && "z-[-1] aspect-video w-full")}
         muted={mute}
         autoPlay
         playsInline

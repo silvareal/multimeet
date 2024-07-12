@@ -13,5 +13,5 @@ export function generateMeetingId(length = 8) {
 
 export function getGravatarUrl() {
   // seed=${id}
-  return `https://api.dicebear.com/9.x/adventurer-neutral/svg?radius=0&glassesProbability=10`;
+  return `https://api.dicebear.com/9.x/adventurer-neutral/svg?radius=0&glassesProbability=10&seed=${generateMeetingId()}`;
 }

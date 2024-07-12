@@ -2,7 +2,7 @@
   height: 100vh;
   position: relative;
   min-height: 100%;
-  @apply w-full flex gap-4 p-4;
+  @apply w-full flex gap-4 p-2;
   /* transition: all 5s linear; */
 }
 

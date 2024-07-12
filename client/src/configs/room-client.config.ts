@@ -5,7 +5,12 @@ import toast from "./toast.config";
 import { roomSocket } from "../constants/socket.constant";
 import { StreamContextType } from "providers/StreamProvider";
 import { RoomStateContextType } from "providers/RoomProvider";
-import { MediaType, PeerInfo, RoomStateType } from "../types/room.type";
+import {
+  MediaType,
+  PeerActionTypeEnum,
+  PeerInfo,
+  RoomStateType,
+} from "../types/room.type";
 
 export class RoomClient {
   toast;
@@ -36,6 +41,8 @@ export class RoomClient {
   }
 
   async join(peerInfo: PeerInfo) {
+    this.toast("connecting...");
+
     this.socket.emit(
       "room:join",
       { roomId: this.roomId, peerInfo },
@@ -43,9 +50,8 @@ export class RoomClient {
         if (error) {
           this.toast.error(error, { position: "top-center" });
         } else {
-          this.toast("connecting...");
           this.toast.dismiss();
-          this.toast.info("Connected", { position: "top-left" });
+          this.toast.info("Connected", { position: "top-center" });
           this.context.dispatch({
             type: RoomStateType.SET_AUTH_PEER,
             payload: {
@@ -142,7 +148,7 @@ export class RoomClient {
           });
         } else {
           //other errors
-          this.toast.error(err.name, {
+          this.toast(err.name, {
             position: "top-center",
             autoClose: false,
           });
@@ -177,6 +183,7 @@ export class RoomClient {
   private async createSendTransport() {
     this.socket.emit(
       "createWebRtcTransport",
+      { producing: true, consuming: false },
       async (
         transportInfo: mediaSoupClient.types.TransportOptions<mediaSoupClient.types.AppData>
       ) => {
@@ -187,13 +194,14 @@ export class RoomClient {
           dtlsParameters,
           sctpParameters,
         } = transportInfo;
-        this.producerTransport = this.mediasoupDevice?.createSendTransport({
-          id,
-          iceParameters,
-          iceCandidates,
-          dtlsParameters,
-          sctpParameters,
-        });
+        this.producerTransport =
+          await this.mediasoupDevice?.createSendTransport({
+            id,
+            iceParameters,
+            iceCandidates,
+            dtlsParameters,
+            sctpParameters,
+          });
 
         if (this.producerTransport) {
           // https://mediasoup.org/documentation/v3/mediasoup-client/api/#transport-on-connect
@@ -228,7 +236,6 @@ export class RoomClient {
                 this.socket.emit(
                   "createProducer",
                   {
-                    transportId: this.producerTransport.id,
                     kind: parameters.kind,
                     rtpParameters: parameters.rtpParameters,
                     appData: parameters.appData,
@@ -245,8 +252,50 @@ export class RoomClient {
             }
           );
 
-          await this.produceMedia(MediaType.AUDIO);
-          await this.produceMedia(MediaType.VIDEO);
+          this.producerTransport.on("connectionstatechange", (state) => {
+            switch (state) {
+              case "connecting":
+                console.log("Producer Transport connecting...");
+                break;
+              case "connected":
+                console.log("Producer Transport connected", {
+                  id: this.producerTransport.id,
+                });
+                break;
+              case "disconnected":
+                console.log("Producer Transport disconnected", {
+                  id: this.producerTransport.id,
+                });
+                break;
+              case "failed":
+                console.warn("Producer Transport failed", {
+                  id: this.producerTransport.id,
+                });
+
+                this.producerTransport.close();
+                this.toast.error(
+                  "Producer Transport failed Check Your Network Connectivity center"
+                );
+
+                break;
+              default:
+                console.log("Producer transport connection state changes", {
+                  state: state,
+                  id: this.producerTransport.id,
+                });
+                break;
+            }
+          });
+
+          this.producerTransport.on("icegatheringstatechange", (state) => {
+            console.log("Producer icegatheringstatechange", {
+              state: state,
+              id: this.producerTransport.id,
+            });
+          });
+
+          await this.produce(MediaType.AUDIO);
+          await this.produce(MediaType.VIDEO);
 
           // get all producers from the server side and create a consumer
           this.socket.emit("getProducers");
@@ -259,12 +308,12 @@ export class RoomClient {
   private async createRecvTransport() {
     this.socket.emit(
       "createWebRtcTransport",
-      async (
+      { producing: false, consuming: true },
+      (
         parameters: mediaSoupClient.types.TransportOptions<mediaSoupClient.types.AppData>
       ) => {
         // https://mediasoup.org/documentation/v3/mediasoup-client/api/#device-createRecvTransport
         // Creates a new WebRTC transport to receive media. The transport must be previously created in the mediasoup router via
-        console.log({ parameters });
         this.consumerTransport = this.mediasoupDevice.createRecvTransport({
           ...parameters,
           dtlsParameters: {
@@ -297,18 +346,57 @@ export class RoomClient {
             }
           }
         );
+
+        this.consumerTransport.on("connectionstatechange", (state) => {
+          switch (state) {
+            case "connecting":
+              console.log("Consumer Transport connecting...");
+              break;
+            case "connected":
+              console.log("Consumer Transport connected", {
+                id: this.consumerTransport.id,
+              });
+              break;
+            case "disconnected":
+              console.log("Consumer Transport disconnected", {
+                id: this.consumerTransport.id,
+              });
+              break;
+            case "failed":
+              console.warn("Consumer Transport failed", {
+                id: this.consumerTransport.id,
+              });
+
+              this.consumerTransport.close();
+              this.toast.error(
+                "Consumer Transport failed Check Your Network Connectivity center"
+              );
+              break;
+            default:
+              console.log("Consumer transport connection state changes", {
+                state: state,
+                id: this.consumerTransport.id,
+              });
+              break;
+          }
+        });
+
+        this.consumerTransport.on("icegatheringstatechange", (state) => {
+          console.log("Consumer icegatheringstatechange", {
+            state: state,
+            id: this.consumerTransport.id,
+          });
+        });
       }
     );
   }
 
   // Producer
-  private async produceMedia(type: MediaType) {
+  private async produce(type: MediaType) {
     try {
       let producer!: Producer;
       let track;
 
-      // canSendMic: this._mediasoupDevice.canProduce("audio"),
-      // canSendWebcam: this._mediasoupDevice.canProduce("video"),
       switch (type) {
         case MediaType.AUDIO:
           if (!this.mediasoupDevice.canProduce(MediaType.AUDIO)) {
@@ -325,7 +413,10 @@ export class RoomClient {
               opusFec: true,
               opusNack: true,
             },
-            appData: { mediaType: type },
+            appData: {
+              peerId: this.context.roomState.authPeer?.id,
+              mediaType: type,
+            },
           });
           producer = this.micProducer;
 
@@ -348,7 +439,10 @@ export class RoomClient {
             codecOptions: {
               videoGoogleStartBitrate: 1000,
             },
-            appData: { mediaType: type },
+            appData: {
+              peerId: this.context.roomState.authPeer?.id,
+              mediaType: type,
+            },
           });
           producer = this.webcamProducer;
           break;
@@ -359,46 +453,133 @@ export class RoomClient {
 
       this.context.dispatch({
         type: RoomStateType.ADD_PRODUCER,
-        payload: { type, producer },
+        payload: producer,
       });
 
       producer?.on("transportclose", () => {
-        // this._webcamProducer = null;
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-expect-error
+        if (type === MediaType.AUDIO) this.micProducer = null;
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-expect-error
+        if (type === MediaType.VIDEO) this.webcamProducer = null;
       });
 
       producer?.on("trackended", () => {
-        // store.dispatch(
-        //   requestActions.notify({
-        //     type: "error",
-        //     text: "Webcam disconnected!",
-        //   })
-        // );
-        // this.disableWebcam().catch(() => {});
+        this.toast.error(
+          `${type === MediaType.AUDIO ? "Mic" : "webcam"} Disconnected`
+        );
+        this.removeProduce(type);
       });
     } catch (error) {
       console.log("media error", error);
     }
   }
 
+  private async removeProduce(type: MediaType) {
+    try {
+      let producer!: Producer;
+
+      switch (type) {
+        case MediaType.AUDIO:
+          producer = this.micProducer;
+          break;
+
+        case MediaType.VIDEO:
+          producer = this.webcamProducer;
+          break;
+        default:
+          break;
+      }
+
+      if (producer) {
+        producer.close();
+
+        this.context.dispatch({
+          type: RoomStateType.REMOVE_PRODUCER,
+          payload: { producerId: producer?.id },
+        });
+
+        this.socket.emit("closeProducer", { producerId: producer.id });
+      }
+    } catch (error) {
+      console.log("media error", error);
+    }
+  }
+
+  async muteWebcam() {
+    try {
+      // console.log({ producer: this.webcamProducer });
+      const producer = this.context.roomState.producers.find(
+        (producer) => producer.appData.mediaType === MediaType.VIDEO
+      );
+
+      if (!producer) throw new Error("Failed to get video producer");
+
+      this.context.dispatch({
+        type: RoomStateType.PAUSE_PRODUCER,
+        payload: { producerId: producer?.id },
+      });
+
+      this.socket.emit("pauseProducer", {
+        producerId: producer.id,
+      });
+
+      producer.pause();
+
+      this.socket.emit("sendPeerAction", {
+        type: PeerActionTypeEnum.video,
+        action: !this.context.roomState.authPeer?.peerVideo,
+      });
+    } catch (error) {
+      console.error("Failed to mute", error);
+    }
+  }
+
+  async unmuteWebcam() {
+    try {
+      const producer = this.context.roomState.producers.find(
+        (producer) => producer.appData.mediaType === MediaType.VIDEO
+      );
+
+      if (!producer) throw new Error("Failed to get video producer");
+
+      this.context.dispatch({
+        type: RoomStateType.RESUME_PRODUCER,
+        payload: { producerId: producer?.id },
+      });
+
+      console.log({ socket: this.socket?.id || "" });
+
+      this.socket.emit("resumeProducer", {
+        producerId: producer.id,
+      });
+
+      producer.resume();
+
+      this.socket.emit("sendPeerAction", {
+        type: PeerActionTypeEnum.video,
+        action: !this.context.roomState.authPeer?.peerVideo,
+      });
+    } catch (error) {
+      console.error("Failed to unmute", error);
+    }
+  }
+
   // Consumer
-  async consumerMedia(data: {
+  private async consume(data: {
     producerId: string;
     peerInfo: PeerInfo;
     type: string;
+    appData: any;
   }) {
-    const { producerId, peerInfo, type } = data;
-
-    console.log({
-      producerId,
-      consumerTransportId: this.consumerTransport.id,
-    });
+    const { producerId, peerInfo } = data;
 
     this.socket.emit(
       "createConsumer",
       {
         producerId,
         rtpCapabilities: this.mediasoupDevice.rtpCapabilities,
-        consumerTransportId: this.consumerTransport.id,
       },
       async (params: any) => {
         const consumer = await this.consumerTransport.consume({
@@ -406,7 +587,7 @@ export class RoomClient {
           producerId: params.producerId,
           kind: params.kind,
           rtpParameters: params.rtpParameters,
-          appData: { peerId: peerInfo.id, type: type },
+          appData: data.appData,
         });
 
         this.context.dispatch({
@@ -426,6 +607,39 @@ export class RoomClient {
     );
   }
 
+  // private async consumeConsumer(params: {
+  //   peerInfo: PeerInfo;
+  //   producerId: string;
+  //   id: string;
+  //   kind: any;
+  //   rtpParameters: any;
+  //   type: string;
+  //   appData: AppData;
+  //   producerPaused: boolean;
+  // }) {
+  //   const consumer = await this.consumerTransport.consume({
+  //     id: params.id,
+  //     producerId: params.producerId,
+  //     kind: params.kind,
+  //     rtpParameters: params.rtpParameters,
+  //     appData: params.appData,
+  //   });
+
+  //   this.context.dispatch({
+  //     type: RoomStateType.ADD_PEER,
+  //     payload: params.peerInfo,
+  //   });
+
+  //   this.context.dispatch({
+  //     type: RoomStateType.ADD_CONSUMER,
+  //     payload: consumer,
+  //   });
+
+  //   this.toast("new consumer");
+
+  //   this.socket.emit("resumeConsumer", { consumerId: params?.id });
+  // }
+
   private initializeSocket() {
     this.socket.on(
       "newProducers",
@@ -434,13 +648,64 @@ export class RoomClient {
           producerId: string;
           peerInfo: PeerInfo;
           type: string;
+          appData: any;
         }[]
       ) => {
         console.log("newProducers");
         if (producers.length > 0) {
           for (const producer of producers) {
-            await this.consumerMedia(producer);
+            await this.consume(producer);
           }
+        }
+      }
+    );
+
+    // this.socket.on(
+    //   "newConsumers",
+    //   async (params: {
+    //     peerInfo: PeerInfo;
+    //     producerId: string;
+    //     id: string;
+    //     kind: any;
+    //     rtpParameters: any;
+    //     type: string;
+    //     appData: AppData;
+    //     producerPaused: boolean;
+    //   }) => {
+    //     console.log({ consumer: params });
+    //     this.consumeConsumer({ ...params });
+    //   }
+    // );
+
+    this.socket.on(
+      "peerAction",
+      async (data: {
+        type: PeerActionTypeEnum;
+        action: unknown;
+        peer: PeerInfo;
+      }) => {
+        console.log({ data });
+        this.context.dispatch({
+          type: RoomStateType.UPDATE_PEER,
+          payload: {
+            type: data.type,
+            action: data.action,
+            peerId: data?.peer?.id || "",
+          },
+        });
+
+        switch (data.type) {
+          case PeerActionTypeEnum.video:
+            this.toast(`video ${data?.action ? "on" : "off"}`);
+            break;
+          case PeerActionTypeEnum.audio:
+            break;
+          case PeerActionTypeEnum.screenShare:
+            break;
+          case PeerActionTypeEnum.raiseHand:
+            break;
+          case PeerActionTypeEnum.rec:
+            break;
         }
       }
     );

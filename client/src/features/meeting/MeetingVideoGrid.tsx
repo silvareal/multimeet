@@ -20,6 +20,7 @@ export default function MeetingVideoGrid({ transformPerspective }: any) {
       (consumer) => consumer.appData.peerId === peer.id
     ),
   }));
+  console.log({ otherPeers });
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const mediaTracks: any = [
@@ -95,7 +96,7 @@ export default function MeetingVideoGrid({ transformPerspective }: any) {
     peer: PeerInfo;
     isMe: false;
     consumers: Consumer[] | undefined;
-    producers: { type: MediaType; producer: Producer }[] | undefined;
+    producers: Producer[] | undefined;
   }[] = mediaTracks.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
@@ -111,7 +112,7 @@ export default function MeetingVideoGrid({ transformPerspective }: any) {
 
   const isLastPage = totalPages === currentPage;
   const isFirstPage = currentPage === 1;
-  // console.log({ roomStateContext });
+
   return (
     <div
       ref={containerRef}
@@ -123,8 +124,8 @@ export default function MeetingVideoGrid({ transformPerspective }: any) {
           videoTrack={
             (mediaTracks?.isMe
               ? mediaTracks?.producers?.find(
-                  (producer) => producer.type === MediaType.VIDEO
-                )?.producer?.track
+                  (producer) => producer?.appData?.mediaType === MediaType.VIDEO
+                )?.track
               : mediaTracks?.consumers?.find(
                   (consumer) => consumer.kind === MediaType.VIDEO
                 )?.track) || null
@@ -132,8 +133,8 @@ export default function MeetingVideoGrid({ transformPerspective }: any) {
           audioTrack={
             (mediaTracks?.isMe
               ? mediaTracks?.producers?.find(
-                  (producer) => producer.type === MediaType.AUDIO
-                )?.producer?.track
+                  (producer) => producer?.appData?.mediaTyp === MediaType.AUDIO
+                )?.track
               : mediaTracks?.consumers?.find(
                   (consumer) => consumer.kind === MediaType.AUDIO
                 )?.track) || null

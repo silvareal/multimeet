@@ -28,15 +28,22 @@ export enum MediaType {
 
 export type RoomState = {
   authPeer: PeerInfo | null;
-  producers: { type: MediaType; producer: Producer }[] | [];
+  producers: Producer[] | [];
   consumers: Consumer[] | [];
   peers: PeerInfo[] | [];
 };
 
 export enum RoomStateType {
   SET_AUTH_PEER = "SET_AUTH_PEER",
+
   ADD_PEER = "ADD_PEER",
+  UPDATE_PEER = "UPDATE_PEER",
+
   ADD_PRODUCER = "ADD_PRODUCER",
+  REMOVE_PRODUCER = "REMOVE_PRODUCER",
+  RESUME_PRODUCER = "RESUME_PRODUCER",
+  PAUSE_PRODUCER = "PAUSE_PRODUCER",
+
   ADD_CONSUMER = "ADD_CONSUMER",
 }
 
@@ -47,7 +54,19 @@ export type RoomStateAction =
     }
   | {
       type: RoomStateType.ADD_PRODUCER;
-      payload: { type: MediaType; producer: Producer };
+      payload: Producer;
+    }
+  | {
+      type: RoomStateType.REMOVE_PRODUCER;
+      payload: { producerId: string };
+    }
+  | {
+      type: RoomStateType.PAUSE_PRODUCER;
+      payload: { producerId: string };
+    }
+  | {
+      type: RoomStateType.RESUME_PRODUCER;
+      payload: { producerId: string };
     }
   | {
       type: RoomStateType.ADD_CONSUMER;
@@ -56,4 +75,16 @@ export type RoomStateAction =
   | {
       type: RoomStateType.ADD_PEER;
       payload: PeerInfo;
+    }
+  | {
+      type: RoomStateType.UPDATE_PEER;
+      payload: { type: PeerActionTypeEnum; action: any; peerId: string };
     };
+
+export enum PeerActionTypeEnum {
+  video = "video",
+  audio = "audio",
+  screenShare = "screenShare",
+  raiseHand = "raiseHand",
+  rec = "rec",
+}
