@@ -165,7 +165,8 @@ export async function RoomSocket(
       const room = rooms.get(socket.data?.roomId);
       if (!room) return;
       room.socket = socket;
-      await room?.closeProducer(producerId);
+      const peer = await room.getPeer(socket.id);
+      await peer?.closeProducer(producerId);
     });
 
     socket.on("pauseProducer", async ({ producerId }) => {
@@ -189,7 +190,7 @@ export async function RoomSocket(
         if (!room) return;
         room.socket = socket;
 
-        const consumer = await room?.createPeerConsumer({
+        const consumer = await room?.createConsumer({
           producerId,
           rtpCapabilities,
         });
@@ -209,7 +210,6 @@ export async function RoomSocket(
     );
 
     socket.on("getProducers", async () => {
-      // if (!rooms.has(socket.data?.roomId)) return;
       const room = rooms.get(socket.data?.roomId);
       if (!room) return;
       room.socket = socket;
@@ -243,8 +243,16 @@ export async function RoomSocket(
       }
     );
 
-    socket.on("disconnect", () => {
-      console.log("user disconnected");
+    socket.on("disconnect", async () => {
+      const room = rooms.get(socket.data?.roomId);
+      if (!room) return;
+
+      room.socket = socket;
+
+      room.removePeer();
+
+      const peer = await room.getPeer(socket.id);
+      socket.to(room.roomId).emit("peerRemoved", peer);
     });
   });
 }

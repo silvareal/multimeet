@@ -59,7 +59,7 @@ export default class Room {
       await peer?.addTransport(transport);
 
       transport.on("dtlsstatechange", (dtlsState) => {
-        if (dtlsState === "closed") {
+        if (dtlsState === "failed" || dtlsState === "closed") {
           transport.close();
         }
       });
@@ -67,11 +67,11 @@ export default class Room {
       transport.on("icestatechange", (iceState) => {
         if (iceState === "disconnected" || iceState === "closed") {
           logger.warn(
-            'WebRtcTransport "icestatechange" event [iceState:%s], closing peer',
+            'WebRtcTransport "icestatechange" event, closing peer',
             iceState
           );
 
-          // peer.close();
+          transport.close();
         }
       });
 
@@ -134,29 +134,12 @@ export default class Room {
       },
     ]);
 
-    // this.peers.forEach((consumerPeer) => {
-    //   if (consumerPeer.id !== peer.id) {
-    //     console.log({ consumerPeer });
-    //     this.createConsumer({
-    //       consumerPeer,
-    //       producerPeer: peer,
-    //       producer,
-    //     });
-    //   }
-    // });
+    producer.on("transportclose", () => {
+      logger.debug("transportclose Producer event");
+      peer.closeProducer(producer.id);
+    });
 
     return producer;
-  }
-
-  async closeProducer(producerId: string) {
-    try {
-      const peer = await this.getPeer(this.socket.id);
-      const producer = peer?.getProducer(producerId);
-      await producer?.close();
-      peer?.delProducer(producerId);
-    } catch (error) {
-      logger.error("Failed to close producer");
-    }
   }
 
   async pauseProducer(producerId: string) {
@@ -180,7 +163,7 @@ export default class Room {
   }
 
   // Creates a mediasoup Consumer for the given mediasoup Producer.
-  async createPeerConsumer({
+  async createConsumer({
     producerId,
     rtpCapabilities,
   }: {
@@ -216,63 +199,20 @@ export default class Room {
 
     peer?.addConsumer(consumer);
 
-    return consumer;
-  }
-
-  async createConsumer({
-    consumerPeer,
-    producerPeer,
-    producer,
-  }: {
-    consumerPeer: Peer;
-    producerPeer: Peer;
-    producer: Producer;
-  }) {
-    const producerId = producer.id;
-    const rtpCapabilities = await this.getRouterRtpCapabilities();
-    // https://mediasoup.org/documentation/v3/mediasoup/api/#router-canConsume
-    // Whether the given RTP capabilities are valid to consume the given producer.
-    if (
-      !this.router.canConsume({
-        producerId,
-        rtpCapabilities,
-      })
-    ) {
-      logger.error("Failed to consume");
-      return;
-    }
-
-    const peerConsumerTransport = consumerPeer?.getConsumerTransport();
-
-    const consumer = await peerConsumerTransport?.consume({
-      producerId,
-      rtpCapabilities, // Enable NACK for OPUS.
-      enableRtx: true,
-      paused: true,
+    consumer.on("transportclose", () => {
+      logger.debug("transportclose Consumer event");
+      peer?.removeConsumer(consumer.id);
     });
 
-    await consumer?.resume();
+    consumer.on("producerclose", () => {
+      logger.debug('Consumer closed due to "producerclose" event');
+      peer?.removeConsumer(consumer.id);
 
-    if (!consumer) return;
-
-    await this.socket.to(consumerPeer.id).emit("newConsumers", {
-      peerInfo: producerPeer.getPeerInfo(),
-      producerId: producer.id,
-      id: consumer?.id,
-      kind: consumer?.kind,
-      rtpParameters: consumer.rtpParameters,
-      type: consumer.type,
-      appData: {
-        ...producer.appData,
-        peerId: producerPeer.id,
-        peer: consumerPeer.getPeerInfo(),
-      },
-      producerPaused: consumer.producerPaused,
+      // Notify the client that consumer is closed
+      this.socket.broadcast.emit("consumerClosed", {
+        consumerId: consumer.id,
+      });
     });
-
-    if (!consumer) return;
-
-    consumerPeer?.addConsumer(consumer);
 
     return consumer;
   }
@@ -295,6 +235,19 @@ export default class Room {
 
   async addPeer(peer: Peer) {
     return this.peers.set(peer?.id, peer);
+  }
+
+  async delPeer(peerId: string) {
+    return this.peers.delete(peerId);
+  }
+
+  async removePeer() {
+    const peer = await this.getPeer(this.socket.id);
+    if (!peer) return;
+    peer?.close();
+    this.delPeer(peer.id);
+
+    //TODO: at interval get room with empty peer and close router
   }
 
   async getPeerProducers() {
@@ -321,7 +274,6 @@ export default class Room {
 
   async sendPeerAction(type: PeerActionTypeEnum, action: any) {
     try {
-      console.log({ type, action });
       const peer = await this.getPeer(this.socket.id);
       if (!peer) return;
 

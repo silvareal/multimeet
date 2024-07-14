@@ -40,6 +40,21 @@ export class RoomClient {
     this.streamContext = streamContext;
   }
 
+  async close() {
+    try {
+      console.debug("close()");
+
+      this.socket.disconnect();
+
+      // Close mediasoup Transports.
+      if (this.producerTransport) this.producerTransport.close();
+
+      if (this.consumerTransport) this.consumerTransport.close();
+
+      this.context.dispatch({ type: RoomStateType.LEAVE_ROOM });
+    } catch (error) {}
+  }
+
   async join(peerInfo: PeerInfo) {
     this.toast("connecting...");
 
@@ -51,21 +66,20 @@ export class RoomClient {
           this.toast.error(error, { position: "top-center" });
         } else {
           this.toast.dismiss();
-          this.toast.info("Connected", { position: "top-center" });
           this.context.dispatch({
             type: RoomStateType.SET_AUTH_PEER,
             payload: {
               ...response,
             },
           });
-          this.process();
+          this.joinRoom();
           this.initializeSocket();
         }
       }
     );
   }
 
-  private async process() {
+  private async joinRoom() {
     await this.socket.emit(
       "getRouterRtpCapabilities",
       async (rtpCapabilities: mediaSoupClient.types.RtpCapabilities) => {
@@ -120,7 +134,6 @@ export class RoomClient {
           //webcam or mic are already in use
           this.toast.error("webcam or mic are already in use", {
             position: "top-center",
-            autoClose: false,
           });
         } else if (
           err.name === "OverconstrainedError" ||
@@ -129,7 +142,6 @@ export class RoomClient {
           //constraints can not be satisfied by avb. devices
           this.toast.error("constraints can not be satisfied by avb. devices", {
             position: "top-center",
-            autoClose: false,
           });
         } else if (
           err.name === "NotAllowedError" ||
@@ -138,19 +150,16 @@ export class RoomClient {
           //permission denied in browser
           this.toast.error("permission denied in browser", {
             position: "top-center",
-            autoClose: false,
           });
         } else if (err.name === "TypeError" || err.name === "TypeError") {
           //empty constraints object
           this.toast.error("empty constraints object", {
             position: "top-center",
-            autoClose: false,
           });
         } else {
           //other errors
           this.toast(err.name, {
             position: "top-center",
-            autoClose: false,
           });
         }
       });
@@ -509,7 +518,6 @@ export class RoomClient {
 
   async muteWebcam() {
     try {
-      // console.log({ producer: this.webcamProducer });
       const producer = this.context.roomState.producers.find(
         (producer) => producer.appData.mediaType === MediaType.VIDEO
       );
@@ -566,6 +574,62 @@ export class RoomClient {
     }
   }
 
+  async muteMic() {
+    try {
+      const producer = this.context.roomState.producers.find(
+        (producer) => producer.appData.mediaType === MediaType.AUDIO
+      );
+
+      if (!producer) throw new Error("Failed to get Mic producer");
+
+      this.context.dispatch({
+        type: RoomStateType.PAUSE_PRODUCER,
+        payload: { producerId: producer?.id },
+      });
+
+      this.socket.emit("pauseProducer", {
+        producerId: producer.id,
+      });
+
+      producer.pause();
+
+      this.socket.emit("sendPeerAction", {
+        type: PeerActionTypeEnum.audio,
+        action: !this.context.roomState.authPeer?.peerAudio,
+      });
+    } catch (error) {
+      console.error("Failed to mute audio", error);
+    }
+  }
+
+  async unmuteMic() {
+    try {
+      const producer = this.context.roomState.producers.find(
+        (producer) => producer.appData.mediaType === MediaType.AUDIO
+      );
+
+      if (!producer) throw new Error("Failed to get Audio producer");
+
+      this.context.dispatch({
+        type: RoomStateType.RESUME_PRODUCER,
+        payload: { producerId: producer?.id },
+      });
+
+      this.socket.emit("resumeProducer", {
+        producerId: producer.id,
+      });
+
+      producer.resume();
+
+      this.socket.emit("sendPeerAction", {
+        type: PeerActionTypeEnum.audio,
+        action: !this.context.roomState.authPeer?.peerVideo,
+      });
+    } catch (error) {
+      console.error("Failed to unmute", error);
+    }
+  }
+
   // Consumer
   private async consume(data: {
     producerId: string;
@@ -600,45 +664,17 @@ export class RoomClient {
           payload: consumer,
         });
 
-        this.toast("new consumer");
-
         this.socket.emit("resumeConsumer", { consumerId: params?.id });
       }
     );
   }
 
-  // private async consumeConsumer(params: {
-  //   peerInfo: PeerInfo;
-  //   producerId: string;
-  //   id: string;
-  //   kind: any;
-  //   rtpParameters: any;
-  //   type: string;
-  //   appData: AppData;
-  //   producerPaused: boolean;
-  // }) {
-  //   const consumer = await this.consumerTransport.consume({
-  //     id: params.id,
-  //     producerId: params.producerId,
-  //     kind: params.kind,
-  //     rtpParameters: params.rtpParameters,
-  //     appData: params.appData,
-  //   });
-
-  //   this.context.dispatch({
-  //     type: RoomStateType.ADD_PEER,
-  //     payload: params.peerInfo,
-  //   });
-
-  //   this.context.dispatch({
-  //     type: RoomStateType.ADD_CONSUMER,
-  //     payload: consumer,
-  //   });
-
-  //   this.toast("new consumer");
-
-  //   this.socket.emit("resumeConsumer", { consumerId: params?.id });
-  // }
+  private async removeConsumer(consumerId: string) {
+    await this.context.dispatch({
+      type: RoomStateType.REMOVE_CONSUMER,
+      payload: { consumerId },
+    });
+  }
 
   private initializeSocket() {
     this.socket.on(
@@ -651,7 +687,6 @@ export class RoomClient {
           appData: any;
         }[]
       ) => {
-        console.log("newProducers");
         if (producers.length > 0) {
           for (const producer of producers) {
             await this.consume(producer);
@@ -660,23 +695,6 @@ export class RoomClient {
       }
     );
 
-    // this.socket.on(
-    //   "newConsumers",
-    //   async (params: {
-    //     peerInfo: PeerInfo;
-    //     producerId: string;
-    //     id: string;
-    //     kind: any;
-    //     rtpParameters: any;
-    //     type: string;
-    //     appData: AppData;
-    //     producerPaused: boolean;
-    //   }) => {
-    //     console.log({ consumer: params });
-    //     this.consumeConsumer({ ...params });
-    //   }
-    // );
-
     this.socket.on(
       "peerAction",
       async (data: {
@@ -684,7 +702,6 @@ export class RoomClient {
         action: unknown;
         peer: PeerInfo;
       }) => {
-        console.log({ data });
         this.context.dispatch({
           type: RoomStateType.UPDATE_PEER,
           payload: {
@@ -696,7 +713,6 @@ export class RoomClient {
 
         switch (data.type) {
           case PeerActionTypeEnum.video:
-            this.toast(`video ${data?.action ? "on" : "off"}`);
             break;
           case PeerActionTypeEnum.audio:
             break;
@@ -710,9 +726,18 @@ export class RoomClient {
       }
     );
 
+    this.socket.on("consumerClosed", async ({ consumerId }) => {
+      await this.removeConsumer(consumerId);
+    });
+
     this.socket.on("peerJoined", async (peer: PeerInfo) => {
       // @ts-ignore
-      this.toast.userJoined({ ...peer }, { autoClose: false });
+      this.toast.userJoined({ ...peer });
+    });
+
+    this.socket.on("peerRemoved", async (peer: PeerInfo) => {
+      // @ts-ignore
+      this.toast.userLeft({ ...peer });
     });
   }
 }

@@ -11,6 +11,9 @@ export default function useMeeting(roomId: string): {
   getLocalStream: (callback: (stream: MediaStream) => void) => void;
   muteWebcam: () => Promise<void>;
   unmuteWebcam: () => Promise<void>;
+  muteMic: () => Promise<void>;
+  unmuteMic: () => Promise<void>;
+  close: () => Promise<void>;
 } {
   const roomClientContext = useContext(RoomClientContext);
   const roomStateContext = useContext(RoomStateContext);
@@ -27,6 +30,10 @@ export default function useMeeting(roomId: string): {
     return room.join(peerInfo);
   }
 
+  async function close() {
+    return room.close();
+  }
+
   async function muteWebcam() {
     return room.muteWebcam();
   }
@@ -35,9 +42,25 @@ export default function useMeeting(roomId: string): {
     return room.unmuteWebcam();
   }
 
+  async function muteMic() {
+    return room.muteMic();
+  }
+
+  async function unmuteMic() {
+    return room.unmuteMic();
+  }
+
   async function getLocalStream(callback: (stream: MediaStream) => void) {
     return room.getLocalStream(callback);
   }
 
-  return { join, getLocalStream, muteWebcam, unmuteWebcam };
+  return {
+    join,
+    getLocalStream,
+    muteWebcam,
+    unmuteWebcam,
+    muteMic,
+    unmuteMic,
+    close,
+  };
 }

@@ -35,16 +35,16 @@ export type RoomState = {
 
 export enum RoomStateType {
   SET_AUTH_PEER = "SET_AUTH_PEER",
-
   ADD_PEER = "ADD_PEER",
   UPDATE_PEER = "UPDATE_PEER",
-
+  REMOVE_PEER = "REMOVE_PEER",
   ADD_PRODUCER = "ADD_PRODUCER",
   REMOVE_PRODUCER = "REMOVE_PRODUCER",
   RESUME_PRODUCER = "RESUME_PRODUCER",
   PAUSE_PRODUCER = "PAUSE_PRODUCER",
-
   ADD_CONSUMER = "ADD_CONSUMER",
+  REMOVE_CONSUMER = "REMOVE_CONSUMER",
+  LEAVE_ROOM = "LEAVE_ROOM",
 }
 
 export type RoomStateAction =
@@ -79,7 +79,12 @@ export type RoomStateAction =
   | {
       type: RoomStateType.UPDATE_PEER;
       payload: { type: PeerActionTypeEnum; action: any; peerId: string };
-    };
+    }
+  | {
+      type: RoomStateType.LEAVE_ROOM;
+    }
+  | { type: RoomStateType.REMOVE_PEER; payload: { peerId: string } }
+  | { type: RoomStateType.REMOVE_CONSUMER; payload: { consumerId: string } };
 
 export enum PeerActionTypeEnum {
   video = "video",

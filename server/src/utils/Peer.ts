@@ -10,6 +10,7 @@ import {
   Producer,
   ProducerOptions,
 } from "mediasoup/node/lib/types";
+import logger from "../helpers/logger.helper";
 
 export class Peer {
   id;
@@ -89,6 +90,26 @@ export class Peer {
     return this.consumers.set(consumer.id, consumer);
   }
 
+  removeConsumer(consumerId: string) {
+    const consumer = this.getConsumer(consumerId);
+    if (!consumer) return;
+
+    try {
+      consumer.close();
+    } catch (error: any) {
+      logger.warn("Close Consumer", error.message);
+    }
+
+    this.delConsumer(consumerId);
+
+    logger.debug("Consumer closed and deleted", {
+      peerName: this.peerName,
+      appData: consumer.appData,
+      consumerId: consumer.id,
+      consumerClosed: consumer.closed,
+    });
+  }
+
   getProducer(id: string) {
     return this.producers.get(id);
   }
@@ -99,6 +120,26 @@ export class Peer {
 
   addProducer(producer: Producer<AppData>) {
     return this.producers.set(producer.id, producer);
+  }
+
+  closeProducer(producerId: string) {
+    const producer = this.getProducer(producerId);
+    if (!producer) return;
+
+    try {
+      producer.close();
+    } catch (error: any) {
+      logger.warn("Close Producer", error.message);
+    }
+
+    this.delProducer(producerId);
+
+    logger.debug("Producer closed and deleted", {
+      peerName: this.peerName,
+      appData: producer.appData,
+      producerId: producer.id,
+      producerClosed: producer.closed,
+    });
   }
 
   getPeerInfo() {
@@ -117,5 +158,21 @@ export class Peer {
     };
   }
 
-  async getPeerName() {}
+  close() {
+    // Iterate and close all mediasoup Transport associated to this Peer, so all
+    // its Producers and Consumers will also be closed.
+    this.transports.forEach((transport, transport_id) => {
+      transport.close();
+      this.delTransport(transport_id);
+      logger.debug("Closed and deleted peer transport", {
+        transport_id: transport_id,
+        transport_closed: transport.closed,
+      });
+    });
+
+    logger.debug("CLOSE PEER - CHECK TRANSPORTS | PRODUCERS | CONSUMERS", {
+      peer_id: this.id,
+      peer_name: this.peerName,
+    });
+  }
 }
