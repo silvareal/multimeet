@@ -179,7 +179,6 @@ export class RoomClient {
         routerRtpCapabilities: this.routerRtpCapabilities,
       });
     } catch (error: any) {
-      console.log({ error });
       if (error.name === "UnsupportedError") {
         this.toast.error("Browser not supported", { position: "top-center" });
       } else {
@@ -333,8 +332,6 @@ export class RoomClient {
             role: "auto",
           },
         });
-
-        console.log({ consumerTransport: this.consumerTransport });
 
         // https://mediasoup.org/documentation/v3/mediasoup-client/api/#transport-on-connect
         this.consumerTransport.on(
@@ -557,8 +554,6 @@ export class RoomClient {
         payload: { producerId: producer?.id },
       });
 
-      console.log({ socket: this.socket?.id || "" });
-
       this.socket.emit("resumeProducer", {
         producerId: producer.id,
       });
@@ -623,7 +618,7 @@ export class RoomClient {
 
       this.socket.emit("sendPeerAction", {
         type: PeerActionTypeEnum.audio,
-        action: !this.context.roomState.authPeer?.peerVideo,
+        action: !this.context.roomState.authPeer?.peerAudio,
       });
     } catch (error) {
       console.error("Failed to unmute", error);

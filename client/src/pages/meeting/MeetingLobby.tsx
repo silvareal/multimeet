@@ -103,11 +103,11 @@ export default function MeetingLobby() {
           <MeetingVideoContainer
             className="w-full h-[450px]"
             name={formik.values.peerName}
-            mute={true}
             audioTrack={stream?.getAudioTracks()?.[0] || null}
             videoTrack={stream?.getVideoTracks()?.[0] || null}
             avatar={formik.values.avatar}
             mic={formik.values.peerAudio}
+            isMe={true}
             camera={formik.values.peerVideo}
           />
           <div className="flex justify-between gap-5 mt-2 absolute bottom-3">

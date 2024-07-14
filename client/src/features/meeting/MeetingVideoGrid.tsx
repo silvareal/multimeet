@@ -139,12 +139,13 @@ export default function MeetingVideoGrid({ transformPerspective }: any) {
                   (consumer) => consumer.kind === MediaType.AUDIO
                 )?.track) || null
           }
-          mute={true}
+          isMe={mediaTracks?.isMe}
           avatar={mediaTracks?.peer?.avatar || ""}
-          mic={mediaTracks?.peer?.peerAudio || false}
+          mic={mediaTracks?.peer?.peerAudio}
           camera={mediaTracks?.peer?.peerVideo || false}
         />
       ))}
+
       {totalPages > 1 && (
         <div className="absolute w-full flex justify-between top h-20 px-5">
           <div>

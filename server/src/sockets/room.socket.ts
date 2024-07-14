@@ -118,7 +118,6 @@ export async function RoomSocket(
             producing,
             consuming,
           });
-          console.log({ transport: transport?.id });
 
           callback({
             id: transport?.id,

@@ -66,7 +66,10 @@ const reducer = (state: RoomState, action: RoomStateAction): RoomState => {
       );
 
       if (!newPauseState.authPeer || !pauseProducer) return newPauseState;
-
+      console.log({
+        pauseProducer,
+        mediatype: pauseProducer?.appData.mediaType,
+      });
       if (pauseProducer?.appData.mediaType === MediaType.VIDEO) {
         newPauseState.authPeer.peerVideo = false;
       }

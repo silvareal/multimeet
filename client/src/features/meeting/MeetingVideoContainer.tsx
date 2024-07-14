@@ -1,4 +1,6 @@
+import { Icon } from "@iconify-icon/react/dist/iconify.js";
 import clsx from "clsx";
+import VoicePitch from "common/VoicePitch";
 import { useEffect, useRef } from "react";
 
 type MeetingVideoContainerProps = {
@@ -6,11 +8,12 @@ type MeetingVideoContainerProps = {
   audioTrack: MediaStreamTrack | null;
   videoTrack: MediaStreamTrack | null;
   className?: string;
-  mute?: boolean;
   avatar: string;
   mic: boolean;
   camera: boolean;
+  isMe?: boolean;
 };
+
 export default function MeetingVideoContainer(
   props: MeetingVideoContainerProps
 ) {
@@ -18,10 +21,10 @@ export default function MeetingVideoContainer(
     audioTrack,
     videoTrack,
     avatar,
-    mute,
     camera,
     mic,
     name,
+    isMe,
     className,
     ...rest
   } = props;
@@ -64,16 +67,26 @@ export default function MeetingVideoContainer(
         "video-container w-full aspect-video"
       )}
     >
-      <div>
-        <div></div>
-        <div></div>
+      <div className="absolute top-5 w-full z-10 px-5  flex justify-end gap-4">
+        <VoicePitch audioTrack={audioTrack} />
+        <div>
+          <Icon
+            className="bg-white text-black rounded-full p-1"
+            icon={mic ? "carbon:microphone" : "carbon:microphone-off"}
+          />
+        </div>
       </div>
-      <audio ref={refAudio} autoPlay muted={mute} controls={false} />
 
-      {/* <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRXxfn1j1vKFy8yJeBGl2AS6Dcah-lKgHofg&s" /> */}
+      <audio
+        ref={refAudio}
+        autoPlay
+        muted={isMe ? true : mic}
+        controls={false}
+      />
+
       <video
         className={clsx(!camera && "z-[-1] aspect-video w-full")}
-        muted={mute}
+        muted={isMe ? true : mic}
         autoPlay
         playsInline
         ref={refVideo}

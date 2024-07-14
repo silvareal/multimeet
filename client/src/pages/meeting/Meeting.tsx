@@ -9,6 +9,7 @@ import { RoomStateContext } from "providers/RoomProvider.tsx";
 import MeetingDetailsVideoGrid from "../../features/meeting/MeetingVideoGrid";
 import useMeeting from "hooks/useMeeting.tsx";
 import { useNavigate, useParams } from "react-router-dom";
+import useClipboard from "hooks/useClipboard.tsx";
 
 export default function Meeting() {
   const { id } = useParams<{ id: string }>() as { id: string };
@@ -18,6 +19,7 @@ export default function Meeting() {
   const [transformPerspective, setTransformPerspective] = useState(false);
   const { muteWebcam, unmuteWebcam, unmuteMic, muteMic, close } =
     useMeeting(id);
+  const meetingLinkClipboard = useClipboard();
 
   const handleToggleWebCam = () => {
     roomStateContext.roomState.authPeer?.peerVideo
@@ -33,6 +35,10 @@ export default function Meeting() {
     close();
     navigate("/");
   };
+
+  const handleCopyMeetingLink = () => [
+    meetingLinkClipboard.writeText(`${window.location.origin}/${id}`),
+  ];
 
   const mainActions = useMemo(
     () => [
@@ -101,7 +107,10 @@ export default function Meeting() {
                   </div>
                   <div className="flex w-full justify-between gap-2 mt-4">
                     <div>
-                      <button className="icon-button">
+                      <button
+                        className="icon-button"
+                        onClick={handleCopyMeetingLink}
+                      >
                         <Icon icon="solar:copy-bold" />
                       </button>
                     </div>
