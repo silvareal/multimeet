@@ -1,33 +1,33 @@
 import { Icon } from "@iconify-icon/react/dist/iconify.js";
+import { RoomStateContext } from "providers/RoomProvider";
+import { useContext } from "react";
 
 export default function MeetingParticipantsTab() {
-  const participants = [
-    {
-      name: "Sylvernus Akubo (You)",
-      img: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRXxfn1j1vKFy8yJeBGl2AS6Dcah-lKgHofg&s",
-    },
-    {
-      name: "Sylvernus Akubo",
-      img: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRXxfn1j1vKFy8yJeBGl2AS6Dcah-lKgHofg&s",
-    },
-    {
-      name: "Sylvernus Akubo",
-      img: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRXxfn1j1vKFy8yJeBGl2AS6Dcah-lKgHofg&s",
-    },
-  ];
+  const roomStateContext = useContext(RoomStateContext);
+
   return (
     <div className="mt-5 flex flex-col gap-5">
-      {participants.map((participant) => (
+      {roomStateContext.roomState.peers.map((peer) => (
         <div className="flex justify-between items-center gap-2">
           <div className="inline-flex gap-2">
             <img
               className="w-[25px] h-[25px] object-cover rounded-full"
-              src={participant.img}
+              src={peer.avatar}
             />
-            <h5>{participant.name}</h5>
+            <h5>{peer.peerName}</h5>
           </div>
 
-          <Icon icon="ion:mic-circle" />
+          <div className="flex items-center gap-2">
+            <Icon
+              icon={peer.peerVideo ? "bi:camera-video" : "bi:camera-video-off"}
+            />
+
+            <Icon
+              icon={
+                peer?.peerAudio ? "carbon:microphone" : "carbon:microphone-off"
+              }
+            />
+          </div>
         </div>
       ))}
     </div>

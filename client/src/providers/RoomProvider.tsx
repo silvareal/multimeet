@@ -22,7 +22,16 @@ const reducer = (state: RoomState, action: RoomStateAction): RoomState => {
       return { ...state, authPeer: action.payload };
 
     case RoomStateType.ADD_PRODUCER:
+      const peerIndexExist = state.producers.findIndex(
+        (peer) => peer.appData.mediaType === action.payload.appData.mediaType
+      );
+
+      if (peerIndexExist !== -1) {
+        state.producers[peerIndexExist] = action.payload;
+      }
+
       return { ...state, producers: [...state.producers, action.payload] };
+
     case RoomStateType.UPDATE_PEER:
       const newPeers = [...state.peers];
       const peerIndex = newPeers.findIndex(
@@ -66,10 +75,7 @@ const reducer = (state: RoomState, action: RoomStateAction): RoomState => {
       );
 
       if (!newPauseState.authPeer || !pauseProducer) return newPauseState;
-      console.log({
-        pauseProducer,
-        mediatype: pauseProducer?.appData.mediaType,
-      });
+
       if (pauseProducer?.appData.mediaType === MediaType.VIDEO) {
         newPauseState.authPeer.peerVideo = false;
       }
